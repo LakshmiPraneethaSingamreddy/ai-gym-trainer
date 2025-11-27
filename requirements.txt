@@ -1,0 +1,10 @@
+opencv-python
+mediapipe
+numpy
+pandas
+streamlit
+fastapi
+uvicorn
+pytest
+black
+flake8
