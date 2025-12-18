@@ -1,6 +1,8 @@
 import cv2
 import mediapipe as mp
 from src.cv.landmark_filter import LandmarkFilter
+from src.cv.temporal_smoother import TemporalSmoother
+
 class PoseDetector:
     def __init__(self,
                  static_image_mode=False,
@@ -19,6 +21,7 @@ class PoseDetector:
         )
         self.mp_draw = mp.solutions.drawing_utils
         self.landmark_filter = LandmarkFilter(visibility_threshold=0.5)
+        self.temporal_smoother = TemporalSmoother(alpha=0.3)
         self.results = None
 
     def process(self, frame):
@@ -41,9 +44,11 @@ class PoseDetector:
             return landmarks
 
         h, w, _ = frame.shape
-        pose_landmarks = self.landmark_filter.filter(self.results.pose_landmarks.landmark)
+        raw_landmarks = self.results.pose_landmarks.landmark
+        filtered_landmarks = self.landmark_filter.filter(raw_landmarks)
+        smoothed_landmarks = self.temporal_smoother.smooth(filtered_landmarks)
         # pose_landmarks = self.results.pose_landmarks.landmark
-        for idx, lm in enumerate(pose_landmarks):
+        for idx, lm in enumerate(smoothed_landmarks):
             landmarks.append({
                 "id": idx,
                 "x": lm.x,
