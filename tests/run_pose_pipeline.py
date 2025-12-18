@@ -6,7 +6,7 @@ from src.data.logger import LandmarkLogger
 def main():
     cam = Camera()
     detector = PoseDetector()
-    logger = LandmarkLogger()   # comment out if not logging
+    logger = LandmarkLogger()   
 
     while True:
         frame = cam.read()

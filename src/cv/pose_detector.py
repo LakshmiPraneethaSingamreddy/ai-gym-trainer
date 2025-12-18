@@ -1,6 +1,6 @@
 import cv2
 import mediapipe as mp
-
+from src.cv.landmark_filter import LandmarkFilter
 class PoseDetector:
     def __init__(self,
                  static_image_mode=False,
@@ -18,6 +18,7 @@ class PoseDetector:
             min_tracking_confidence=tracking_confidence
         )
         self.mp_draw = mp.solutions.drawing_utils
+        self.landmark_filter = LandmarkFilter(visibility_threshold=0.5)
         self.results = None
 
     def process(self, frame):
@@ -40,7 +41,9 @@ class PoseDetector:
             return landmarks
 
         h, w, _ = frame.shape
-        for idx, lm in enumerate(self.results.pose_landmarks.landmark):
+        pose_landmarks = self.landmark_filter.filter(self.results.pose_landmarks.landmark)
+        # pose_landmarks = self.results.pose_landmarks.landmark
+        for idx, lm in enumerate(pose_landmarks):
             landmarks.append({
                 "id": idx,
                 "x": lm.x,
