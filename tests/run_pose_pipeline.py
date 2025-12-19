@@ -15,6 +15,8 @@ def main():
 
         detector.process(frame)
         landmarks = detector.extract_landmarks(frame)
+        
+        # print(type(landmarks), landmarks) to check if it is rejevting the bad poses or not
 
         logger.log(landmarks)
         frame = detector.draw_landmarks(frame)

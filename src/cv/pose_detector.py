@@ -2,6 +2,8 @@ import cv2
 import mediapipe as mp
 from src.cv.landmark_filter import LandmarkFilter
 from src.cv.temporal_smoother import TemporalSmoother
+from src.cv.pose_validator import PoseValidator
+
 
 class PoseDetector:
     def __init__(self,
@@ -23,6 +25,7 @@ class PoseDetector:
         self.landmark_filter = LandmarkFilter(visibility_threshold=0.5)
         self.temporal_smoother = TemporalSmoother(alpha=0.3)
         self.results = None
+        self.pose_validator = PoseValidator()
 
     def process(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -47,7 +50,10 @@ class PoseDetector:
         raw_landmarks = self.results.pose_landmarks.landmark
         filtered_landmarks = self.landmark_filter.filter(raw_landmarks)
         smoothed_landmarks = self.temporal_smoother.smooth(filtered_landmarks)
+        is_valid_pose = self.pose_validator.is_pose_valid(smoothed_landmarks)
         # pose_landmarks = self.results.pose_landmarks.landmark
+        if not is_valid_pose:
+            return []
         for idx, lm in enumerate(smoothed_landmarks):
             landmarks.append({
                 "id": idx,
