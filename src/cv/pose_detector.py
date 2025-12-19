@@ -3,6 +3,7 @@ import mediapipe as mp
 from src.cv.landmark_filter import LandmarkFilter
 from src.cv.temporal_smoother import TemporalSmoother
 from src.cv.pose_validator import PoseValidator
+from src.cv.coordinate_normalizer import CoordinateNormalizer
 
 
 class PoseDetector:
@@ -26,6 +27,7 @@ class PoseDetector:
         self.temporal_smoother = TemporalSmoother(alpha=0.3)
         self.results = None
         self.pose_validator = PoseValidator()
+        self.coordinate_normalizer = CoordinateNormalizer()
 
     def process(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -54,7 +56,9 @@ class PoseDetector:
         # pose_landmarks = self.results.pose_landmarks.landmark
         if not is_valid_pose:
             return []
-        for idx, lm in enumerate(smoothed_landmarks):
+        normalized_landmarks = self.coordinate_normalizer.normalize(smoothed_landmarks)
+        print("Hip-centered landmark[LEFT_HIP]:", normalized_landmarks[23].x, normalized_landmarks[23].y)
+        for idx, lm in enumerate(normalized_landmarks):
             landmarks.append({
                 "id": idx,
                 "x": lm.x,
