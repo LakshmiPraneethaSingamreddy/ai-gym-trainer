@@ -18,10 +18,10 @@ class SquatFormValidator:
         hip_angle = AngleCalculator.hip_angle(landmarks, side="left")
 
         # Back angle (shoulder-hip-knee)
-        shoulder = landmarks[11]  # LEFT_SHOULDER
-        hip = landmarks[23]       # LEFT_HIP
-        knee = landmarks[25]      # LEFT_KNEE
-        back_angle = AngleCalculator.calculate_angle(shoulder, hip, knee)
+        back_angle = AngleCalculator.back_angle(landmarks)
+
+        if back_angle > 30:
+            self.feedback.append("Keep your back straighter")
 
         # ---- Form Rules ----
 
@@ -32,10 +32,6 @@ class SquatFormValidator:
         # Hip hinge
         if hip_angle > 160:
             self.feedback.append("Sit back more — hinge at the hips")
-
-        # Back posture
-        if back_angle < 150:
-            self.feedback.append("Keep your back straighter")
 
         if not self.feedback:
             self.feedback.append("Good form ✅")

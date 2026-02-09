@@ -1,21 +1,33 @@
 import cv2
+from src.exercise.jumping_jack.jumping_jack_exercise import JumpingJackExercise
+from src.exercise.lunge.lunge_exercise import LungeExercise
+from src.exercise.plank.plank_exercise import PlankExercise
 from src.cv.camera import Camera
 from src.cv.pose_detector import PoseDetector
 from src.data.logger import LandmarkLogger
-from src.exercise.squat_state_machine import SquatStateMachine
-from src.ai.rep_counter import RepCounter
-from src.ai.form_validator import SquatFormValidator
-from src.ai.performance_scorer import PerformanceScorer
+from src.exercise.squat.squat_exercise import SquatExercise
+from src.exercise.pushup.pushup_exercise import PushupExercise
+from src.exercise.exercise_registry import ExerciseRegistry
 
+
+# choose exercise
+ACTIVE_EXERCISE = "Pushup"  # Options: "Squat", "Pushup", "Lunge", "Plank", "JumpingJack"
 
 def main():
     cam = Camera()
     detector = PoseDetector()
     logger = LandmarkLogger() 
-    squat_machine = SquatStateMachine() 
-    rep_counter = RepCounter() 
-    validator = SquatFormValidator()
-    scorer = PerformanceScorer()
+
+
+    registry = ExerciseRegistry()
+    registry.register(SquatExercise())
+    registry.register(PushupExercise())
+    registry.register(LungeExercise())
+    registry.register(PlankExercise())
+    registry.register(JumpingJackExercise())
+
+
+    exercise = registry.get(ACTIVE_EXERCISE)
 
 
     while True:
@@ -26,33 +38,28 @@ def main():
         detector.process(frame)
         landmarks = detector.extract_landmarks(frame)
         
-        # print(type(landmarks), landmarks) to check if it is rejevting the bad poses or not
-
-
         if landmarks:
-            squat_state = squat_machine.update(landmarks)
-            print("Squat State:", squat_state.name)
+            state = exercise.update(landmarks)
+            reps = exercise.count_rep(state.name)
+            feedback = exercise.validate_form(landmarks)
+            score = exercise.score_rep(landmarks, state)
 
-            reps = rep_counter.update(squat_state.name)
+            print("Exercise:", exercise.name)
+            print("State:", state.name)
             print("Reps:", reps)
-            
-            feedback = validator.validate(landmarks)
-            print("Form Feedback:", feedback)
 
-            rep_score = scorer.update(landmarks,squat_state.name,reps)
-            if rep_score:
-                print("Rep Completed!")
-                print("Depth Score:", rep_score["depth_score"])
-                print("Hip Score:", rep_score["hip_score"])
-                print("Final Score:", rep_score["final_score"])
-                print("Average Score:", scorer.get_average_score())
-                print("-" * 40)
+            if feedback:
+                print("Form Feedback:", feedback)
+
+            if score:
+                print("Score:", score)
+
             
 
-            logger.log(landmarks)
+        logger.log(landmarks)
         frame = detector.draw_landmarks(frame)
 
-        cv2.imshow("Phase 1 - Pose Pipeline", frame)
+        cv2.imshow("AI Gym Trainer", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 

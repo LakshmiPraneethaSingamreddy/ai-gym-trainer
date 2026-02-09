@@ -19,6 +19,28 @@ class AngleCalculator:
 
         return angle
 
+
+    @staticmethod
+    def back_angle(landmarks, side="left"):
+        """
+        Calculates torso lean angle relative to vertical.
+        0° = perfectly upright
+        Higher = more forward lean
+        """
+        if side == "left":
+            shoulder = landmarks[11]  # LEFT_SHOULDER
+            hip = landmarks[23]       # LEFT_HIP
+        else:
+            shoulder = landmarks[12]
+            hip = landmarks[24]
+
+        dx = shoulder["x"] - hip["x"]
+        dy = hip["y"] - shoulder["y"]   # inverted because y grows downward
+
+        angle = math.degrees(math.atan2(abs(dx), abs(dy)))
+        return angle
+    
+    
     @staticmethod
     def knee_angle(landmarks, side="left"):
         if side == "left":
@@ -44,3 +66,16 @@ class AngleCalculator:
             knee = landmarks[26]
 
         return AngleCalculator.calculate_angle(shoulder, hip, knee)
+    
+    @staticmethod
+    def elbow_angle(landmarks, side="left"):
+        if side == "left":
+            shoulder = landmarks[11] # LEFT_SHOULDER
+            elbow = landmarks[13]    # LEFT_ELBOW
+            wrist = landmarks[15]    # LEFT_WRIST
+        else:
+            shoulder = landmarks[12]
+            elbow = landmarks[14]
+            wrist = landmarks[16]
+
+        return AngleCalculator.calculate_angle(shoulder, elbow, wrist)
