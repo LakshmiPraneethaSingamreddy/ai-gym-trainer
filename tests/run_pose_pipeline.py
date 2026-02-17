@@ -11,7 +11,7 @@ from src.exercise.exercise_registry import ExerciseRegistry
 
 
 # choose exercise
-ACTIVE_EXERCISE = "Pushup"  # Options: "Squat", "Pushup", "Lunge", "Plank", "JumpingJack"
+ACTIVE_EXERCISE = "JumpingJack"  # Options: "Squat", "Pushup", "Lunge", "Plank", "JumpingJack"
 
 def main():
     cam = Camera()
