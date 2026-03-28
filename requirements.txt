@@ -5,6 +5,7 @@ pandas
 streamlit
 fastapi
 uvicorn
+websockets
 pytest
 black
 flake8

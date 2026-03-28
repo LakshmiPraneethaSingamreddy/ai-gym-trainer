@@ -9,7 +9,7 @@ from src.cv.coordinate_normalizer import CoordinateNormalizer
 class PoseDetector:
     def __init__(self,
                  static_image_mode=False,
-                 model_complexity=1,
+                 model_complexity=0,
                  smooth_landmarks=True,
                  detection_confidence=0.5,
                  tracking_confidence=0.5):
@@ -23,8 +23,8 @@ class PoseDetector:
             min_tracking_confidence=tracking_confidence
         )
         self.mp_draw = mp.solutions.drawing_utils
-        self.landmark_filter = LandmarkFilter(visibility_threshold=0.5)
-        self.temporal_smoother = TemporalSmoother(alpha=0.3)
+        self.landmark_filter = LandmarkFilter(visibility_threshold=0.35)  # Balanced (was 0.5, I changed to 0.25)
+        self.temporal_smoother = TemporalSmoother(alpha=0.3)  # RESTORED to stable level
         self.results = None
         self.pose_validator = PoseValidator()
         self.coordinate_normalizer = CoordinateNormalizer()
@@ -57,7 +57,6 @@ class PoseDetector:
         if not is_valid_pose:
             return []
         normalized_landmarks = self.coordinate_normalizer.normalize(smoothed_landmarks)
-        print("Hip-centered landmark[LEFT_HIP]:", normalized_landmarks[23].x, normalized_landmarks[23].y)
         for idx, lm in enumerate(normalized_landmarks):
             landmarks.append({
                 "id": idx,

@@ -3,6 +3,11 @@ class RepCounter:
         self.count = 0
         self.last_state = None
 
+    def reset(self):
+        """Reset counter for a new workout session"""
+        self.count = 0
+        self.last_state = None
+
     def update(self, current_state):
         # Count a rep when user comes back to standing from bottom
         if self.last_state == "ASCENDING" and current_state == "STANDING":

@@ -2,9 +2,9 @@ from typing import List
 from mediapipe.python.solutions.pose import PoseLandmark
 
 class PoseValidator:
-    def __init__(self, visibility_threshold: float = 0.5, max_invalid_frames: int = 5):
-        self.visibility_threshold = visibility_threshold
-        self.max_invalid_frames = max_invalid_frames
+    def __init__(self, visibility_threshold: float = 0.35, max_invalid_frames: int = 10):
+        self.visibility_threshold = visibility_threshold  # Balanced
+        self.max_invalid_frames = max_invalid_frames  # Reasonable tolerance
         self.invalid_frame_count = 0
 
         # Critical joints for full-body validation

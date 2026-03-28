@@ -1,13 +1,16 @@
 # src/exercise/plank/plank_exercise.py
-
+from src.exercise.base_exercise import BaseExercise
 from src.exercise.plank.plank_state_machine import PlankStateMachine
 from src.exercise.plank.plank_rep_counter import PlankTimer
 from src.exercise.plank.plank_form_validator import PlankFormValidator
 from src.exercise.plank.plank_performance_scorer import PlankPerformanceScorer
 
-class PlankExercise:
+
+class PlankExercise(BaseExercise):
+    FEEDBACK_STATES = ["HOLD"]
+
     def __init__(self):
-        self.name = "Plank"
+        super().__init__("Plank")
         self.state_machine = PlankStateMachine()
         self.timer = PlankTimer()
         self.validator = PlankFormValidator()
@@ -24,4 +27,4 @@ class PlankExercise:
         return self.validator.validate(landmarks)
 
     def score_rep(self, landmarks, state):
-        return self.scorer.update(landmarks, state,self.timer)
+        return self.scorer.update(landmarks, state, self.timer)

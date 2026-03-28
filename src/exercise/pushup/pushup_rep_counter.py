@@ -16,6 +16,12 @@ class PushupRepCounter:
         self.last_state = None
         self.valid_rep = False
 
+    def reset(self):
+        """Reset counter for a new workout session"""
+        self.count = 0
+        self.last_state = None
+        self.valid_rep = False
+
     def update(self, state_name, reached_bottom):
         if reached_bottom:
             self.valid_rep = True

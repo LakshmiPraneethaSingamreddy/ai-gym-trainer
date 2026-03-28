@@ -6,6 +6,11 @@ class PlankTimer:
         self.start = None
         self.total = 0
 
+    def reset(self):
+        """Reset timer for a new workout session"""
+        self.start = None
+        self.total = 0
+
     def update(self, state):
         if state == "HOLDING":
             if not self.start:

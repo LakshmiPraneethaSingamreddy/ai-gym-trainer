@@ -5,6 +5,7 @@ from .squat_form_validator import SquatFormValidator
 from .squat_performance_scorer import PerformanceScorer
 
 class SquatExercise(BaseExercise):
+    FEEDBACK_STATES = ["BOTTOM"]
     def __init__(self):
         super().__init__("Squat")
         self.state_machine = SquatStateMachine()
@@ -22,4 +23,4 @@ class SquatExercise(BaseExercise):
         return self.validator.validate(landmarks)
 
     def score_rep(self, landmarks, state):
-        return self.scorer.update(landmarks, state, self.reps)
+        return self.scorer.update(landmarks, state)

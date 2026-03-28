@@ -1,11 +1,15 @@
+from src.exercise.base_exercise import BaseExercise
 from src.exercise.lunge.lunge_state_machine import LungeStateMachine
 from src.exercise.lunge.lunge_rep_counter import LungeRepCounter
 from src.exercise.lunge.lunge_form_validator import LungeFormValidator
 from src.exercise.lunge.lunge_performance_scorer import LungePerformanceScorer
 
-class LungeExercise:
+
+class LungeExercise(BaseExercise):
+    FEEDBACK_STATES = ["BOTTOM"]
+
     def __init__(self):
-        self.name = "Lunge"
+        super().__init__("Lunge")
         self.state_machine = LungeStateMachine()
         self.rep_counter = LungeRepCounter()
         self.validator = LungeFormValidator()
@@ -23,7 +27,7 @@ class LungeExercise:
         return self.validator.validate(landmarks)
 
     def score_rep(self, landmarks, state):
-        return self.scorer.update(landmarks,state)
-        
+        return self.scorer.update(landmarks, state)
 
-        
+
+

@@ -4,6 +4,11 @@ class LungeRepCounter:
         self.count = 0
         self.last_state = None
 
+    def reset(self):
+        """Reset counter for a new workout session"""
+        self.count = 0
+        self.last_state = None
+
     def update(self, state):
         if self.last_state == "ASCENDING" and state == "STANDING":
             self.count += 1

@@ -12,24 +12,25 @@ class PerformanceScorer:
         self.rep_scores = []
         self.current_rep_frames = []
 
-    def update(self, landmarks, squat_state, rep_count):
+    def update(self, landmarks, squat_state):
         """
         Called every frame.
         Collects frame data during a rep and scores it when rep completes.
         """
+        state_name = (squat_state.name if hasattr(squat_state, "name") else squat_state)
 
         knee_angle = AngleCalculator.knee_angle(landmarks, side="left")
         hip_angle = AngleCalculator.hip_angle(landmarks, side="left")
 
         # Collect frame data during movement
-        if squat_state in ["DESCENDING", "BOTTOM", "ASCENDING"]:
+        if state_name in ["DESCENDING", "BOTTOM", "ASCENDING"]:
             self.current_rep_frames.append({
                 "knee_angle": knee_angle,
                 "hip_angle": hip_angle
             })
 
         # When rep finishes → score it
-        if squat_state == "STANDING" and len(self.current_rep_frames) > 0:
+        if state_name == "STANDING" and len(self.current_rep_frames) > 0:
             score = self._score_rep(self.current_rep_frames)
             self.rep_scores.append(score)
             self.current_rep_frames = []

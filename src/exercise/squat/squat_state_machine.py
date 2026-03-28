@@ -11,6 +11,7 @@ class SquatStateMachine:
     def __init__(self):
         self.state = SquatState.STANDING
         self.prev_knee_angle = None
+        self.min_knee_angle_in_descent = 180  # tracks lowest point during descent
 
     def update(self, landmarks):
         knee_angle = AngleCalculator.knee_angle(landmarks, "left")
@@ -27,10 +28,15 @@ class SquatStateMachine:
         if self.state == SquatState.STANDING:
             if moving_down:
                 self.state = SquatState.DESCENDING
+                self.min_knee_angle_in_descent = knee_angle
 
         elif self.state == SquatState.DESCENDING:
+            self.min_knee_angle_in_descent = min(self.min_knee_angle_in_descent, knee_angle)
             if knee_angle < 90:
                 self.state = SquatState.BOTTOM
+            elif moving_up and self.min_knee_angle_in_descent < 100:
+                # Low-FPS case: bottom frame was skipped, but user went deep enough
+                self.state = SquatState.ASCENDING
 
         elif self.state == SquatState.BOTTOM:
             if moving_up:
@@ -39,6 +45,7 @@ class SquatStateMachine:
         elif self.state == SquatState.ASCENDING:
             if knee_angle > 160:
                 self.state = SquatState.STANDING
+                self.min_knee_angle_in_descent = 180
 
         self.prev_knee_angle = knee_angle
         return self.state
