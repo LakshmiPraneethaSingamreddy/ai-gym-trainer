@@ -6,6 +6,7 @@ streamlit
 fastapi
 uvicorn
 websockets
+aiortc
 pytest
 black
 flake8

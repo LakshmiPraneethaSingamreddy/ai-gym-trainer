@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 import json
 import os
 import asyncio
@@ -8,6 +9,7 @@ import base64
 import cv2
 import numpy as np
 from datetime import datetime
+from aiortc import RTCPeerConnection, RTCSessionDescription
 
 from api.engine import WorkoutEngine
 
@@ -22,6 +24,20 @@ app.add_middleware(
 )
 
 engine = WorkoutEngine()
+
+
+def env_flag(name: str, default: str = "1") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+SEND_WS_FRAMES = env_flag("SEND_WS_FRAMES", "1")
+USE_BACKEND_CAMERA = env_flag("USE_BACKEND_CAMERA", "1")
+pcs = set()
+
+
+class RTCOffer(BaseModel):
+    sdp: str
+    type: str
 
 PLAYER_FILE = "src/data/players.json"
 
@@ -69,7 +85,7 @@ def root():
 @app.post("/start")
 def start_workout(exercise: str = "Squat", name: str = "You"):
     selected_exercise = engine.set_exercise(exercise)
-    engine.start()
+    engine.start(use_camera=USE_BACKEND_CAMERA, render_frames=SEND_WS_FRAMES)
     return {"status": "started", "exercise": selected_exercise}
 
 
@@ -109,6 +125,53 @@ def get_state():
     return engine.get_state()
 
 
+@app.post("/webrtc/offer")
+async def webrtc_offer(offer: RTCOffer):
+    pc = RTCPeerConnection()
+    pcs.add(pc)
+
+    @pc.on("connectionstatechange")
+    async def on_connectionstatechange():
+        if pc.connectionState in {"failed", "closed", "disconnected"}:
+            await pc.close()
+            pcs.discard(pc)
+
+    @pc.on("track")
+    def on_track(track):
+        if track.kind != "video":
+            return
+
+        async def consume_video():
+            while True:
+                try:
+                    frame = await track.recv()
+                    # If processing is behind, drop stale frames before expensive conversion.
+                    if engine.has_pending_external_frame():
+                        continue
+                    image = frame.to_ndarray(format="bgr24")
+                    engine.ingest_external_frame(image)
+                except Exception:
+                    break
+
+        asyncio.create_task(consume_video())
+
+    await pc.setRemoteDescription(RTCSessionDescription(sdp=offer.sdp, type=offer.type))
+    answer = await pc.createAnswer()
+    await pc.setLocalDescription(answer)
+
+    return {
+        "sdp": pc.localDescription.sdp,
+        "type": pc.localDescription.type,
+    }
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    if pcs:
+        await asyncio.gather(*[pc.close() for pc in list(pcs)], return_exceptions=True)
+    pcs.clear()
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -124,11 +187,13 @@ async def websocket_endpoint(websocket: WebSocket):
             raw_frame = engine.raw_frame
 
             if not engine.running or raw_frame is None:
-                blank = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(blank, "Camera Stopped", (150, 240),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                _, buffer = cv2.imencode('.jpg', blank, encode_params)
-                frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                frame_b64 = None
+                if SEND_WS_FRAMES:
+                    blank = np.zeros((480, 640, 3), dtype=np.uint8)
+                    cv2.putText(blank, "Camera Stopped", (150, 240),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    _, buffer = cv2.imencode('.jpg', blank, encode_params)
+                    frame_b64 = base64.b64encode(buffer).decode('utf-8')
                 await websocket.send_text(json.dumps({
                     "frame": frame_b64,
                     "landmarks": []
@@ -136,8 +201,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 await asyncio.sleep(0.1)
                 continue
 
-            _, buffer = cv2.imencode('.jpg', raw_frame, encode_params)
-            frame_b64 = base64.b64encode(buffer).decode('utf-8')
+            frame_b64 = None
+            if SEND_WS_FRAMES:
+                _, buffer = cv2.imencode('.jpg', raw_frame, encode_params)
+                frame_b64 = base64.b64encode(buffer).decode('utf-8')
 
             with engine._state_lock:
                 state_snapshot = engine.state.copy()

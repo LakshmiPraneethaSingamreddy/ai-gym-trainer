@@ -34,8 +34,15 @@ function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [history, setHistory] = useState([]); // ✅ NEW
   const [selectedExercise, setSelectedExercise] = useState("Squat");
+  const [landmarks, setLandmarks] = useState([]);
+  const [isWebRTCActive, setIsWebRTCActive] = useState(false);
+  const [isWorkoutActive, setIsWorkoutActive] = useState(false);
 
   const canvasRef = useRef(null);
+  const overlayCanvasRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const pcRef = useRef(null);
 
   function drawSkeleton(ctx, landmarks, w, h) {
     if (!landmarks || landmarks.length === 0) return;
@@ -95,6 +102,66 @@ function App() {
       .catch(err => console.error("History error:", err));
   }, [username]);
 
+  const stopWebRTC = () => {
+    setIsWebRTCActive(false);
+
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+  };
+
+  const startWebRTC = async () => {
+    stopWebRTC();
+
+    const localStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480 },
+      audio: false,
+    });
+    localStreamRef.current = localStream;
+
+    const pc = new RTCPeerConnection();
+    pcRef.current = pc;
+    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    const response = await fetch("http://127.0.0.1:8000/webrtc/offer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sdp: offer.sdp,
+        type: offer.type,
+      }),
+    });
+
+    if (!response.ok) {
+      stopWebRTC();
+      throw new Error("WebRTC signaling failed");
+    }
+
+    const answer = await response.json();
+    await pc.setRemoteDescription(answer);
+    setIsWebRTCActive(true);
+  };
+
+  useEffect(() => {
+    return () => {
+      stopWebRTC();
+    };
+  }, []);
+
   // WebSocket — replaces the 250ms polling interval
   // Receives video frame + landmarks + state in one message at ~30fps
   useEffect(() => {
@@ -104,6 +171,7 @@ function App() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      setLandmarks(data.landmarks || []);
 
       // Update workout state
       if (data.reps !== undefined) {
@@ -127,7 +195,7 @@ function App() {
 
       // Draw frame + skeleton on canvas
       const canvas = canvasRef.current;
-      if (!canvas || !data.frame) return;
+      if (!canvas || !data.frame || isWebRTCActive) return;
       const ctx = canvas.getContext("2d");
       const img = new Image();
       img.onload = () => {
@@ -140,7 +208,45 @@ function App() {
     ws.onerror = (err) => console.error("WebSocket error:", err);
 
     return () => ws.close();
-  }, [username]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [username, isWebRTCActive]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isWebRTCActive) return;
+
+    const video = localVideoRef.current;
+    const stream = localStreamRef.current;
+    if (!video || !stream) return;
+
+    video.srcObject = stream;
+  }, [isWebRTCActive]);
+
+  useEffect(() => {
+    if (!isWebRTCActive) return;
+
+    const canvas = overlayCanvasRef.current;
+    const video = localVideoRef.current;
+    if (!canvas || !video) return;
+
+    const ctx = canvas.getContext("2d");
+    let rafId;
+
+    const drawOverlay = () => {
+      const w = video.videoWidth || 640;
+      const h = video.videoHeight || 480;
+
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawSkeleton(ctx, landmarks, canvas.width, canvas.height);
+      rafId = requestAnimationFrame(drawOverlay);
+    };
+
+    drawOverlay();
+    return () => cancelAnimationFrame(rafId);
+  }, [isWebRTCActive, landmarks]);
 
   // ✅ Badge queue system
   useEffect(() => {
@@ -161,6 +267,43 @@ function App() {
     : 0;
 
   const exercises = ["Squat", "Pushup", "Lunge", "Plank", "JumpingJack"];
+
+  const startWorkout = async () => {
+    try {
+      const res = await fetch(
+        `http://127.0.0.1:8000/start?exercise=${selectedExercise}&name=${username}`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        throw new Error("Failed to start workout");
+      }
+
+      await startWebRTC();
+      setIsWorkoutActive(true);
+    } catch (error) {
+      console.error("Start workout error:", error);
+      stopWebRTC();
+    }
+  };
+
+  const stopWorkout = async () => {
+    stopWebRTC();
+    setIsWorkoutActive(false);
+    try {
+      const res = await fetch(`http://127.0.0.1:8000/stop?name=${username}`, {
+        method: "POST"
+      });
+      if (!res.ok) {
+        throw new Error("Failed to stop workout");
+      }
+
+      const historyRes = await fetch(`http://127.0.0.1:8000/history?name=${username}`);
+      const data = await historyRes.json();
+      setHistory(data);
+    } catch (error) {
+      console.error("Stop workout error:", error);
+    }
+  };
 
   if (!username) {
     return <Login setUsername={setUsername} />;
@@ -186,27 +329,16 @@ function App() {
       <div className="controls">
         <button
           className="button"
-          onClick={() =>
-            fetch(`http://127.0.0.1:8000/start?exercise=${selectedExercise}&name=${username}`, {
-              method: "POST"
-            })
-          }
+          onClick={startWorkout}
+          disabled={isWorkoutActive}
         >
           ▶ Start Workout
         </button>
 
         <button
           className="button button-stop"
-          onClick={() =>
-            fetch(`http://127.0.0.1:8000/stop?name=${username}`, {
-              method: "POST"
-            }).then(() => {
-              // ✅ Refresh history after workout ends
-              fetch(`http://127.0.0.1:8000/history?name=${username}`)
-                .then(res => res.json())
-                .then(data => setHistory(data));
-            })
-          }
+          onClick={stopWorkout}
+          disabled={!isWorkoutActive}
         >
           ⏹ Stop Workout
         </button>
@@ -215,12 +347,30 @@ function App() {
       <div className="main">
         {/* CAMERA */}
         <div className="camera-container">
-          <canvas
-            ref={canvasRef}
-            width={640}
-            height={480}
-            className="camera"
-          />
+          {isWebRTCActive ? (
+            <div className="camera-stack">
+              <video
+                ref={localVideoRef}
+                className="camera"
+                autoPlay
+                playsInline
+                muted
+              />
+              <canvas
+                ref={overlayCanvasRef}
+                width={640}
+                height={480}
+                className="camera camera-overlay"
+              />
+            </div>
+          ) : (
+            <canvas
+              ref={canvasRef}
+              width={640}
+              height={480}
+              className="camera"
+            />
+          )}
         </div>
 
         {/* RIGHT PANEL */}

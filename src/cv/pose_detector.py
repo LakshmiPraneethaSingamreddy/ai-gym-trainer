@@ -23,8 +23,10 @@ class PoseDetector:
             min_tracking_confidence=tracking_confidence
         )
         self.mp_draw = mp.solutions.drawing_utils
-        self.landmark_filter = LandmarkFilter(visibility_threshold=0.35)  # Balanced (was 0.5, I changed to 0.25)
-        self.temporal_smoother = TemporalSmoother(alpha=0.3)  # RESTORED to stable level
+        # Slightly lower visibility threshold avoids dropping usable landmarks.
+        self.landmark_filter = LandmarkFilter(visibility_threshold=0.25)
+        # Higher alpha tracks motion faster, reducing rep transition lag.
+        self.temporal_smoother = TemporalSmoother(alpha=0.5)
         self.results = None
         self.pose_validator = PoseValidator()
         self.coordinate_normalizer = CoordinateNormalizer()

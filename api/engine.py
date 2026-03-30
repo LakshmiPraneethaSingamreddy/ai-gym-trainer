@@ -27,15 +27,19 @@ class WorkoutEngine:
     def __init__(self):
         self.running = False
         self.thread = None
+        self._external_thread = None
         self._state_lock = threading.Lock()
         self._exercise_lock = threading.Lock()
+        self._external_frame_lock = threading.Lock()
 
         self.current_frame = None
         self.raw_frame = None           # Latest camera frame, no processing applied
         self.display_landmarks = []     # Screen-space landmarks (0-1) for canvas overlay
         self._frame_event = threading.Event()  # Signals WebSocket when a new frame is ready
+        self._external_frame = None
         self.cam = None
         self.detector = None
+        self.render_frames = True
 
         # Shared state for frontend
         self.state = {
@@ -73,6 +77,95 @@ class WorkoutEngine:
 
         self.exercise = self.registry.get("Squat")
 
+    def _process_frame(self, frame):
+        detector = self.detector
+        if detector is None or frame is None:
+            return
+
+        # Store the frame used to indicate a fresh processed tick to websocket clients.
+        # When render is disabled, avoid an extra copy to keep processing lightweight.
+        self.raw_frame = frame.copy() if self.render_frames else frame
+        self._frame_event.set()
+
+        detector.process(frame)
+
+        # Capture screen-space landmarks (0-1 range) before normalization.
+        if detector.results and detector.results.pose_landmarks:
+            self.display_landmarks = [
+                {"x": lm.x, "y": lm.y, "visibility": lm.visibility}
+                for lm in detector.results.pose_landmarks.landmark
+            ]
+        else:
+            self.display_landmarks = []
+
+        landmarks = detector.extract_landmarks(frame)
+
+        if self.render_frames:
+            frame = detector.draw_landmarks(frame)
+            self.current_frame = frame
+        else:
+            self.current_frame = None
+
+        if landmarks:
+            with self._exercise_lock:
+                exercise = self.exercise
+
+            state = exercise.update(landmarks)
+            state_name = state.name if hasattr(state, "name") else str(state)
+
+            reps = exercise.count_rep(state_name)
+            score = exercise.score_rep(landmarks, state)
+
+            feedback = None
+            if exercise.allow_feedback(state_name):
+                feedback = self.feedback_controller.update(
+                    exercise,
+                    state_name,
+                    exercise.validate_form(landmarks)
+                )
+
+            self.session.update(reps=reps, score=score, feedback=feedback)
+
+            # XP only on newly completed reps.
+            if reps > self.last_rep_count:
+                final_score = score.get("final_score", 0) if isinstance(score, dict) else 0
+                xp_gain = self.xp_system.calculate_xp({
+                    "avg_score": final_score,
+                    "total_reps": reps
+                })
+
+                self.player.add_xp(xp_gain)
+                self.level_system.check_level_up(self.player)
+
+                self.last_rep_count = reps
+
+            new_badges = self.badge_system.evaluate({
+                "reps": reps,
+                "score": score
+            })
+
+            if new_badges:
+                with self._state_lock:
+                    for badge in new_badges:
+                        if badge.name not in self.unlocked_badges:
+                            self.unlocked_badges.add(badge.name)
+                            self.recent_badges.append(badge.name)
+
+            with self._state_lock:
+                self.state.update({
+                    "reps": reps,
+                    "xp": self.player.xp,
+                    "level": self.player.level,
+                    "xp_required": self.level_system.xp_needed(self.player.level),
+                    "feedback": feedback[-1] if isinstance(feedback, list) else (feedback or ""),
+                    "exercise": exercise.name,
+                    "badges": list(self.recent_badges)
+                })
+        else:
+            with self._state_lock:
+                if self.exercise:
+                    self.state["exercise"] = self.exercise.name
+
     def _reset_exercise_counter(self):
         if self.exercise and hasattr(self.exercise, "rep_counter") and hasattr(self.exercise.rep_counter, "reset"):
             self.exercise.rep_counter.reset()
@@ -106,15 +199,56 @@ class WorkoutEngine:
 
         return selected_name
 
-    def start(self):
+    def start(self, use_camera=True, render_frames=True):
         if not self.running:
             self.running = True
+            self.render_frames = render_frames
 
-            self.cam = Camera()
             self.detector = PoseDetector()
+            self.cam = Camera() if use_camera else None
+            self._external_frame = None
 
-            self.thread = threading.Thread(target=self.run_loop, daemon=True)
-            self.thread.start()
+            if use_camera:
+                self.thread = threading.Thread(target=self.run_loop, daemon=True)
+                self.thread.start()
+                self._external_thread = None
+            else:
+                self.thread = None
+                self._external_thread = threading.Thread(target=self.run_external_loop, daemon=True)
+                self._external_thread.start()
+
+    def ingest_external_frame(self, frame):
+        if not self.running or frame is None:
+            return
+
+        # Keep only the latest frame; stale frames are dropped to avoid lag/backlog.
+        with self._external_frame_lock:
+            self._external_frame = frame
+
+    def has_pending_external_frame(self):
+        with self._external_frame_lock:
+            return self._external_frame is not None
+
+    def run_external_loop(self):
+        while self.running:
+            frame = None
+            with self._external_frame_lock:
+                if self._external_frame is not None:
+                    frame = self._external_frame
+                    self._external_frame = None
+
+            if frame is None:
+                time.sleep(0.002)
+                continue
+
+            try:
+                self._process_frame(frame)
+            except Exception as e:
+                error_msg = traceback.format_exc(limit=2)
+                print(f"ERROR in external run_loop: {error_msg}")
+                self.last_processing_error = error_msg
+                with self._state_lock:
+                    self.state["feedback"] = f"Error: {str(e)}"
 
     def stop(self):
         self.running = False
@@ -126,9 +260,15 @@ class WorkoutEngine:
         if self.thread is not None:
             self.thread.join(timeout=1)
 
+        if self._external_thread is not None:
+            self._external_thread.join(timeout=1)
+
         self.cam = None
         self.detector = None
         self.thread = None
+        self._external_thread = None
+        with self._external_frame_lock:
+            self._external_frame = None
 
         self.current_frame = None   # prevents freeze frame
         self.raw_frame = None
@@ -138,8 +278,7 @@ class WorkoutEngine:
     def run_loop(self):
         while self.running:
             cam = self.cam
-            detector = self.detector
-            if cam is None or detector is None:
+            if cam is None or self.detector is None:
                 time.sleep(0.001)  # Reduce sleep
                 continue
 
@@ -152,93 +291,8 @@ class WorkoutEngine:
             if frame is None:
                 continue
 
-            # Store the raw frame immediately — WebSocket streams this with zero processing delay
-            self.raw_frame = frame.copy()
-            self._frame_event.set()
-
             try:
-                detector.process(frame)
-
-                # Capture screen-space landmarks (0-1 range) BEFORE coordinate normalization
-                # These are used by the frontend canvas to draw the skeleton overlay
-                if detector.results and detector.results.pose_landmarks:
-                    self.display_landmarks = [
-                        {"x": lm.x, "y": lm.y, "visibility": lm.visibility}
-                        for lm in detector.results.pose_landmarks.landmark
-                    ]
-                else:
-                    self.display_landmarks = []
-
-                landmarks = detector.extract_landmarks(frame)
-
-                frame = detector.draw_landmarks(frame)
-                self.current_frame = frame
-
-                if landmarks:
-                    with self._exercise_lock:
-                        exercise = self.exercise
-
-                    state = exercise.update(landmarks)
-                    state_name = state.name if hasattr(state, "name") else str(state)
-
-                    reps = exercise.count_rep(state_name)
-                    score = exercise.score_rep(landmarks, state)
-
-                    feedback = None
-                    if exercise.allow_feedback(state_name):
-                        feedback = self.feedback_controller.update(
-                            exercise,
-                            state_name,
-                            exercise.validate_form(landmarks)
-                        )
-
-                    # Update session
-                    self.session.update(reps=reps, score=score, feedback=feedback)
-
-                    # ✅ XP only on new rep
-                    if reps > self.last_rep_count:
-                        final_score = score.get("final_score", 0) if isinstance(score, dict) else 0
-                        xp_gain = self.xp_system.calculate_xp({
-                            "avg_score": final_score,
-                            "total_reps": reps
-                        })
-
-                        self.player.add_xp(xp_gain)
-                        self.level_system.check_level_up(self.player)
-
-                        self.last_rep_count = reps
-
-                    # ✅ Badges
-                    new_badges = self.badge_system.evaluate({
-                        "reps": reps,
-                        "score": score
-                    })
-
-                    if new_badges:
-                        with self._state_lock:
-                            for badge in new_badges:
-                                if badge.name not in self.unlocked_badges:
-                                    self.unlocked_badges.add(badge.name)
-                                    self.recent_badges.append(badge.name)
-
-                    # ✅ Update shared state - lock only when needed
-                    with self._state_lock:
-                        self.state.update({
-                            "reps": reps,
-                            "xp": self.player.xp,
-                            "level": self.player.level,
-                            "xp_required": self.level_system.xp_needed(self.player.level),
-                            "feedback": feedback[-1] if isinstance(feedback, list) else (feedback or ""),
-                            "exercise": exercise.name,
-                            "badges": list(self.recent_badges)
-                        })
-                else:
-                    # No landmarks detected, still update state frequently
-                    with self._state_lock:
-                        # Keep existing state but update exercise name
-                        if self.exercise:
-                            self.state["exercise"] = self.exercise.name
-                            
+                self._process_frame(frame)
             except Exception as e:
                 error_msg = traceback.format_exc(limit=2)
                 print(f"❌ ERROR in run_loop: {error_msg}")

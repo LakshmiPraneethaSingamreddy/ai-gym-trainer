@@ -32,9 +32,9 @@ class SquatStateMachine:
 
         elif self.state == SquatState.DESCENDING:
             self.min_knee_angle_in_descent = min(self.min_knee_angle_in_descent, knee_angle)
-            if knee_angle < 90:
+            if knee_angle < 95:
                 self.state = SquatState.BOTTOM
-            elif moving_up and self.min_knee_angle_in_descent < 100:
+            elif moving_up and self.min_knee_angle_in_descent < 105:
                 # Low-FPS case: bottom frame was skipped, but user went deep enough
                 self.state = SquatState.ASCENDING
 
@@ -43,7 +43,7 @@ class SquatStateMachine:
                 self.state = SquatState.ASCENDING
 
         elif self.state == SquatState.ASCENDING:
-            if knee_angle > 160:
+            if knee_angle > 155:
                 self.state = SquatState.STANDING
                 self.min_knee_angle_in_descent = 180
 
