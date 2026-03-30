@@ -310,21 +310,39 @@ function App() {
   }
 
   return (
-    <div>
-      <h1 className="title">🏋️ AI Gym Trainer</h1>
+    <div className="app-shell">
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
 
-      <h2>Select Exercise</h2>
-      <div className="exercise-grid">
-        {exercises.map((ex) => (
-          <div
-            key={ex}
-            className={`exercise-card ${selectedExercise === ex ? "active" : ""}`}
-            onClick={() => setSelectedExercise(ex)}
-          >
-            {ex}
-          </div>
-        ))}
-      </div>
+      <header className="hero">
+        <div>
+          <p className="eyebrow">AI Powered Coaching</p>
+          <h1 className="title">AI Gym Trainer</h1>
+          <p className="subtitle">
+            Real-time rep tracking, posture feedback, and progress metrics in one live training board.
+          </p>
+        </div>
+        <div className="user-pill">
+          <span className="pill-label">Athlete: </span>
+          <strong>{username}</strong>
+        </div>
+      </header>
+
+      <section className="exercise-section">
+        <h2 className="section-heading">Choose Workout</h2>
+        <div className="exercise-grid">
+          {exercises.map((ex) => (
+            <button
+              key={ex}
+              type="button"
+              className={`exercise-card ${selectedExercise === ex ? "active" : ""}`}
+              onClick={() => setSelectedExercise(ex)}
+            >
+              {ex}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <div className="controls">
         <button
@@ -332,7 +350,7 @@ function App() {
           onClick={startWorkout}
           disabled={isWorkoutActive}
         >
-          ▶ Start Workout
+          Start Workout
         </button>
 
         <button
@@ -340,44 +358,56 @@ function App() {
           onClick={stopWorkout}
           disabled={!isWorkoutActive}
         >
-          ⏹ Stop Workout
+          Stop Workout
         </button>
       </div>
 
       <div className="main">
         {/* CAMERA */}
-        <div className="camera-container">
-          {isWebRTCActive ? (
-            <div className="camera-stack">
-              <video
-                ref={localVideoRef}
-                className="camera"
-                autoPlay
-                playsInline
-                muted
-              />
+        <section className="camera-container card-surface">
+          <div className="camera-header">
+            <h2>Live Camera</h2>
+            <span className={`status-chip ${isWebRTCActive ? "live" : "idle"}`}>
+              {isWebRTCActive ? "Streaming" : "Idle"}
+            </span>
+          </div>
+
+          <div className="camera-frame">
+            {isWebRTCActive ? (
+              <div className="camera-stack">
+                <video
+                  ref={localVideoRef}
+                  className="camera"
+                  autoPlay
+                  playsInline
+                  muted
+                />
+                <canvas
+                  ref={overlayCanvasRef}
+                  width={640}
+                  height={480}
+                  className="camera camera-overlay"
+                />
+              </div>
+            ) : (
               <canvas
-                ref={overlayCanvasRef}
+                ref={canvasRef}
                 width={640}
                 height={480}
-                className="camera camera-overlay"
+                className="camera"
               />
-            </div>
-          ) : (
-            <canvas
-              ref={canvasRef}
-              width={640}
-              height={480}
-              className="camera"
-            />
-          )}
-        </div>
+            )}
+          </div>
+        </section>
 
         {/* RIGHT PANEL */}
-        <div className="panel">
-          <h2>🏃 {state.exercise}</h2>
+        <aside className="panel">
+          <div className="card current-exercise">
+            <h2>{state.exercise || selectedExercise}</h2>
+            <p>Current movement focus</p>
+          </div>
 
-          <div className="card">
+          <div className="card reps-card">
             <h3>Reps</h3>
             <p className="big-text">{state.reps}</p>
           </div>
@@ -390,16 +420,16 @@ function App() {
                 style={{ width: `${xpPercent}%` }}
               />
             </div>
-            <p>{state.xp} / {state.xp_required} XP</p>
+              <p>{state.xp} / {state.xp_required} XP</p>
           </div>
 
-          <div className="card">
+          <div className="card feedback-card">
             <h3>Feedback</h3>
             <p>{state.feedback || "Good form 👍"}</p>
           </div>
 
           <div className="card leaderboard">
-            <h3>🏆 Leaderboard</h3>
+            <h3>Leaderboard</h3>
             {leaderboard.map((user, i) => (
               <div key={i} className="leaderboard-item">
                 <span>{i + 1}. {user.name}</span>
@@ -410,26 +440,28 @@ function App() {
 
           {/* ✅ HISTORY UI (NEW) */}
           <div className="card">
-            <h3>📜 Workout History</h3>
+            <h3>Workout History</h3>
 
             {history.length === 0 ? (
               <p>No workouts yet</p>
             ) : (
-              history.slice().reverse().map((h, i) => (
-                <div key={i} className="history-item">
-                  <span>{h.exercise}</span>
-                  <span>{h.reps} reps</span>
-                  <span>{new Date(h.date).toLocaleDateString()}</span>
-                </div>
-              ))
+              <div className="history-scroll" role="region" aria-label="Workout history list">
+                {history.slice().reverse().map((h, i) => (
+                  <div key={i} className="history-item">
+                    <span>{h.exercise}</span>
+                    <span>{h.reps} reps</span>
+                    <span>{new Date(h.date).toLocaleDateString()}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-        </div>
+        </aside>
       </div>
 
       {showBadge && (
         <div className="badge-popup">
-          🏆 {showBadge} Unlocked!
+          {showBadge} Unlocked!
         </div>
       )}
     </div>
