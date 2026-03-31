@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 import Login from "./Login";
+import { API_BASE, WS_BASE } from "./apiConfig";
 
 // MediaPipe skeleton connections (pairs of landmark indices)
 const POSE_CONNECTIONS = [
@@ -14,16 +15,18 @@ const POSE_CONNECTIONS = [
   [24,26],[26,28],[28,30],[28,32],[30,32]
 ];
 
+const INITIAL_STATE = {
+  reps: 0,
+  xp: 0,
+  xp_required: 100,
+  level: 1,
+  feedback: "",
+  exercise: "",
+  badges: []
+};
+
 function App() {
-  const [state, setState] = useState({
-    reps: 0,
-    xp: 0,
-    xp_required: 100,
-    level: 1,
-    feedback: "",
-    exercise: "",
-    badges: []
-  });
+  const [state, setState] = useState(INITIAL_STATE);
 
   const [username, setUsername] = useState(
     localStorage.getItem("username") || ""
@@ -43,6 +46,8 @@ function App() {
   const localVideoRef = useRef(null);
   const localStreamRef = useRef(null);
   const pcRef = useRef(null);
+  const mediaTrackRegistryRef = useRef(new Set());
+  const startSequenceRef = useRef(0);
 
   function drawSkeleton(ctx, landmarks, w, h) {
     if (!landmarks || landmarks.length === 0) return;
@@ -80,7 +85,7 @@ function App() {
     if (!username) return;
 
     const fetchLeaderboard = () => {
-      fetch("http://127.0.0.1:8000/leaderboard")
+      fetch(`${API_BASE}/leaderboard`)
         .then(res => res.json())
         .then(data => setLeaderboard(data))
         .catch(err => console.error("Leaderboard error:", err));
@@ -96,7 +101,7 @@ function App() {
   useEffect(() => {
     if (!username) return;
 
-    fetch(`http://127.0.0.1:8000/history?name=${username}`)
+    fetch(`${API_BASE}/history?name=${username}`)
       .then(res => res.json())
       .then(data => setHistory(data))
       .catch(err => console.error("History error:", err));
@@ -106,6 +111,15 @@ function App() {
     setIsWebRTCActive(false);
 
     if (pcRef.current) {
+      try {
+        pcRef.current.getSenders().forEach((sender) => {
+          if (sender.track) {
+            sender.track.stop();
+          }
+        });
+      } catch (error) {
+        console.error("Error stopping RTCPeerConnection senders:", error);
+      }
       pcRef.current.close();
       pcRef.current = null;
     }
@@ -116,19 +130,96 @@ function App() {
       localStreamRef.current = null;
     }
 
+    // Stop any tracks we have ever opened in this session.
+    mediaTrackRegistryRef.current.forEach((track) => {
+      try {
+        track.stop();
+      } catch (error) {
+        console.error("Error stopping media track:", error);
+      }
+    });
+    mediaTrackRegistryRef.current.clear();
+
     if (localVideoRef.current) {
+      const attachedStream = localVideoRef.current.srcObject;
+      if (attachedStream && typeof attachedStream.getTracks === "function") {
+        attachedStream.getTracks().forEach((track) => track.stop());
+      }
+      localVideoRef.current.pause();
       localVideoRef.current.srcObject = null;
     }
+
+    // Extra safeguard for any leftover preview elements.
+    document.querySelectorAll("video").forEach((videoEl) => {
+      const src = videoEl.srcObject;
+      if (src && typeof src.getTracks === "function") {
+        src.getTracks().forEach((track) => track.stop());
+      }
+      videoEl.pause();
+      videoEl.srcObject = null;
+    });
+
+    if (overlayCanvasRef.current) {
+      const overlayCtx = overlayCanvasRef.current.getContext("2d");
+      overlayCtx.clearRect(0, 0, overlayCanvasRef.current.width, overlayCanvasRef.current.height);
+    }
+
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      ctx.fillStyle = "#0a0f23";
+      ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      ctx.fillStyle = "#c7d2ea";
+      ctx.font = "600 22px Outfit";
+      ctx.textAlign = "center";
+      ctx.fillText("Camera Stopped", canvasRef.current.width / 2, canvasRef.current.height / 2);
+    }
+
+    setLandmarks([]);
   };
 
   const startWebRTC = async () => {
     stopWebRTC();
 
+    const canUseGetUserMedia =
+      typeof navigator !== "undefined" &&
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === "function";
+
+    if (!canUseGetUserMedia) {
+      const isLikelyInsecureOrigin =
+        typeof window !== "undefined" &&
+        window.location.protocol !== "https:" &&
+        window.location.hostname !== "localhost" &&
+        window.location.hostname !== "127.0.0.1";
+
+      const reason = isLikelyInsecureOrigin
+        ? "Camera access is blocked on insecure HTTP origin. Open the app on HTTPS (or localhost)."
+        : "This browser/device does not expose camera APIs (mediaDevices.getUserMedia).";
+
+      throw new Error(reason);
+    }
+
     const localStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 480 },
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: { ideal: "user" },
+      },
       audio: false,
     });
     localStreamRef.current = localStream;
+    localStream.getTracks().forEach((track) => mediaTrackRegistryRef.current.add(track));
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = localStream;
+      try {
+        await localVideoRef.current.play();
+      } catch (playError) {
+        console.warn("Local preview play warning:", playError);
+      }
+    }
+    setIsWebRTCActive(true);
 
     const pc = new RTCPeerConnection();
     pcRef.current = pc;
@@ -137,7 +228,7 @@ function App() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    const response = await fetch("http://127.0.0.1:8000/webrtc/offer", {
+    const response = await fetch(`${API_BASE}/webrtc/offer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -153,7 +244,6 @@ function App() {
 
     const answer = await response.json();
     await pc.setRemoteDescription(answer);
-    setIsWebRTCActive(true);
   };
 
   useEffect(() => {
@@ -167,7 +257,7 @@ function App() {
   useEffect(() => {
     if (!username) return;
 
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+    const ws = new WebSocket(`${WS_BASE}/ws`);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -248,11 +338,16 @@ function App() {
     return () => cancelAnimationFrame(rafId);
   }, [isWebRTCActive, landmarks]);
 
-  // ✅ Badge queue system
+  // ✅ Badge queue system — show badge when queue has items and no badge is showing
   useEffect(() => {
-    if (showBadge || badgeQueue.length === 0) return;
+    if (showBadge !== null || badgeQueue.length === 0) return;
 
     setShowBadge(badgeQueue[0]);
+  }, [badgeQueue, showBadge]);
+
+  // ✅ Auto-hide badge after 3 seconds
+  useEffect(() => {
+    if (showBadge === null) return;
 
     const timer = setTimeout(() => {
       setShowBadge(null);
@@ -260,7 +355,7 @@ function App() {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [badgeQueue, showBadge]);
+  }, [showBadge]);
 
   const xpPercent = state.xp_required
     ? (state.xp / state.xp_required) * 100
@@ -269,40 +364,87 @@ function App() {
   const exercises = ["Squat", "Pushup", "Lunge", "Plank", "JumpingJack"];
 
   const startWorkout = async () => {
+    const myStartSequence = ++startSequenceRef.current;
+
     try {
-      const res = await fetch(
-        `http://127.0.0.1:8000/start?exercise=${selectedExercise}&name=${username}`,
-        { method: "POST" }
-      );
+      const params = new URLSearchParams({
+        exercise: selectedExercise,
+        name: username,
+        use_backend_camera: "false",
+      });
+      const res = await fetch(`${API_BASE}/start?${params.toString()}`, {
+        method: "POST",
+      });
       if (!res.ok) {
         throw new Error("Failed to start workout");
       }
 
       await startWebRTC();
+
+      // If a newer start/stop happened while this one was in-flight, abort this run.
+      if (myStartSequence !== startSequenceRef.current) {
+        stopWebRTC();
+        return;
+      }
+
       setIsWorkoutActive(true);
     } catch (error) {
       console.error("Start workout error:", error);
       stopWebRTC();
+      setIsWorkoutActive(false);
+
+      // If backend session started before camera setup failed, stop it so UI and server stay in sync.
+      try {
+        await fetch(`${API_BASE}/stop?name=${username}`, {
+          method: "POST",
+        });
+      } catch (stopError) {
+        console.error("Start workout cleanup stop error:", stopError);
+      }
     }
   };
 
   const stopWorkout = async () => {
-    stopWebRTC();
+    // Invalidate any in-flight start attempt so stop always wins.
+    startSequenceRef.current += 1;
     setIsWorkoutActive(false);
+
     try {
-      const res = await fetch(`http://127.0.0.1:8000/stop?name=${username}`, {
+      const res = await fetch(`${API_BASE}/stop?name=${username}`, {
         method: "POST"
       });
       if (!res.ok) {
         throw new Error("Failed to stop workout");
       }
 
-      const historyRes = await fetch(`http://127.0.0.1:8000/history?name=${username}`);
+      const historyRes = await fetch(`${API_BASE}/history?name=${username}`);
       const data = await historyRes.json();
       setHistory(data);
     } catch (error) {
       console.error("Stop workout error:", error);
+    } finally {
+      stopWebRTC();
     }
+  };
+
+  const handleLogout = async () => {
+    if (isWorkoutActive) {
+      try {
+        await fetch(`${API_BASE}/stop?name=${username}`, { method: "POST" });
+      } catch (error) {
+        console.error("Logout stop error:", error);
+      }
+    }
+
+    stopWebRTC();
+    setIsWorkoutActive(false);
+    setState({ ...INITIAL_STATE });
+    setHistory([]);
+    setLeaderboard([]);
+    setBadgeQueue([]);
+    setShowBadge(null);
+    localStorage.removeItem("username");
+    setUsername("");
   };
 
   if (!username) {
@@ -323,8 +465,13 @@ function App() {
           </p>
         </div>
         <div className="user-pill">
-          <span className="pill-label">Athlete: </span>
-          <strong>{username}</strong>
+          <div>
+            <span className="pill-label">Athlete: </span>
+            <strong>{username}</strong>
+          </div>
+          <button type="button" className="logout-btn" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </header>
 
@@ -348,7 +495,7 @@ function App() {
         <button
           className="button"
           onClick={startWorkout}
-          disabled={isWorkoutActive}
+          disabled={isWorkoutActive || isWebRTCActive}
         >
           Start Workout
         </button>
@@ -356,7 +503,7 @@ function App() {
         <button
           className="button button-stop"
           onClick={stopWorkout}
-          disabled={!isWorkoutActive}
+          disabled={!(isWorkoutActive || isWebRTCActive)}
         >
           Stop Workout
         </button>

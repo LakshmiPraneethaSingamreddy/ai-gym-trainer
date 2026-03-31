@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: ai-gym-trainer-api
+    env: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: USE_BACKEND_CAMERA
+        value: "0"
+      - key: SEND_WS_FRAMES
+        value: "0"
+
+  - type: web
+    name: ai-gym-trainer-frontend
+    env: static
+    rootDir: ai-gym-frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: build
+    envVars:
+      - key: REACT_APP_API_BASE_URL
+        value: https://ai-gym-trainer-api.onrender.com

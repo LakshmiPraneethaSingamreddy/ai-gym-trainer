@@ -1,20 +1,32 @@
 import React, { useState } from "react";
+import { API_BASE } from "./apiConfig";
 
 function Login({ setUsername }) {
   const [name, setName] = useState("");
+  const [error, setError] = useState("");
 
   const handleLogin = () => {
-    if (!name) return;
+    if (!name.trim()) {
+      setError("Please enter a username.");
+      return;
+    }
 
-    fetch(`http://127.0.0.1:8000/login?name=${name}`, {
+    fetch(`${API_BASE}/login?name=${encodeURIComponent(name)}`, {
       method: "POST"
     })
-      .then(res => res.json())
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.detail || "Login failed");
+        }
+        return data;
+      })
       .then(data => {
+        setError("");
         localStorage.setItem("username", data.name);
         setUsername(data.name);
       })
-      .catch(err => console.error(err));
+      .catch(err => setError(err.message || "Unable to login right now."));
   };
 
   return (
@@ -25,8 +37,14 @@ function Login({ setUsername }) {
         placeholder="Enter username"
         value={name}
         onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            handleLogin();
+          }
+        }}
       />
-      <button onClick={handleLogin}>Enter</button>
+      <button onClick={handleLogin}>Login</button>
+      {error ? <p style={{ color: "#b00020", marginTop: "10px" }}>{error}</p> : null}
     </div>
   );
 }

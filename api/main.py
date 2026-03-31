@@ -1,7 +1,7 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import json
 import os
 import asyncio
@@ -9,9 +9,29 @@ import base64
 import cv2
 import numpy as np
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+from sqlalchemy.orm import Session
 from aiortc import RTCPeerConnection, RTCSessionDescription
 
+from api.db import Base, SessionLocal, get_db
+from api.db import engine as db_engine
+from api.db_models import User
 from api.engine import WorkoutEngine
+from api.user_store import (
+    add_badges,
+    add_history_item,
+    create_user_if_missing,
+    get_leaderboard_payload,
+    get_user_by_name,
+    get_user_history_payload,
+    import_legacy_json_if_empty,
+    list_users_payload,
+    normalize_name,
+    set_user_badges,
+    update_user,
+    user_to_dict,
+)
 
 app = FastAPI()
 
@@ -31,7 +51,7 @@ def env_flag(name: str, default: str = "1") -> bool:
 
 
 SEND_WS_FRAMES = env_flag("SEND_WS_FRAMES", "1")
-USE_BACKEND_CAMERA = env_flag("USE_BACKEND_CAMERA", "1")
+USE_BACKEND_CAMERA = env_flag("USE_BACKEND_CAMERA", "0")
 pcs = set()
 
 
@@ -39,42 +59,67 @@ class RTCOffer(BaseModel):
     sdp: str
     type: str
 
-PLAYER_FILE = "src/data/players.json"
-
-# Ensure file exists
-os.makedirs("src/data", exist_ok=True)
-if not os.path.exists(PLAYER_FILE):
-    with open(PLAYER_FILE, "w") as f:
-        json.dump({}, f)
+LEGACY_PLAYER_FILE = Path(__file__).resolve().parent.parent / "src" / "data" / "players.json"
 
 
-def load_players():
+class SessionHistoryItem(BaseModel):
+    date: str
+    reps: int
+    exercise: str
+
+
+class UserData(BaseModel):
+    xp: int = 0
+    level: int = 1
+    badges: list[str] = Field(default_factory=list)
+    history: list[SessionHistoryItem] = Field(default_factory=list)
+
+
+class UserPatch(BaseModel):
+    xp: Optional[int] = None
+    level: Optional[int] = None
+    badges: Optional[list[str]] = None
+    history: Optional[list[SessionHistoryItem]] = None
+
+
+def validate_user_numbers(xp: Optional[int] = None, level: Optional[int] = None) -> None:
+    if xp is not None and xp < 0:
+        raise HTTPException(status_code=400, detail="XP must be 0 or greater")
+    if level is not None and level < 1:
+        raise HTTPException(status_code=400, detail="Level must be 1 or greater")
+
+
+def parse_history_date(raw_date: str) -> datetime | None:
+    if not raw_date:
+        return None
     try:
-        with open(PLAYER_FILE, "r") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return {}
+        return datetime.fromisoformat(raw_date)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid history date format: {raw_date}. Use ISO format.",
+        ) from exc
 
 
-def save_players(data):
-    with open(PLAYER_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+def sync_engine_player(user: User) -> None:
+    engine.player.name = user.name
+    engine.player.xp = int(user.xp or 0)
+    engine.player.level = int(user.level or 1)
+    engine.player.badges = sorted([badge.badge_name for badge in user.badges])
+
+    with engine._state_lock:
+        engine.state["xp"] = engine.player.xp
+        engine.state["level"] = engine.player.level
+        engine.state["xp_required"] = engine.level_system.xp_needed(engine.player.level)
 
 
-def default_player():
-    return {
-        "xp": 0,
-        "level": 1,
-        "badges": [],
-        "history": []
-    }
-
-
-def ensure_player(players, name):
-    created = name not in players
-    if created:
-        players[name] = default_player()
-    return players[name], created
+@app.on_event("startup")
+def startup_database() -> None:
+    Base.metadata.create_all(bind=db_engine)
+    with SessionLocal() as db:
+        imported = import_legacy_json_if_empty(db, LEGACY_PLAYER_FILE)
+        if imported:
+            db.commit()
 
 
 @app.get("/")
@@ -83,39 +128,40 @@ def root():
 
 
 @app.post("/start")
-def start_workout(exercise: str = "Squat", name: str = "You"):
+def start_workout(exercise: str = "Squat", name: str = "You", use_backend_camera: Optional[bool] = None):
     selected_exercise = engine.set_exercise(exercise)
-    engine.start(use_camera=USE_BACKEND_CAMERA, render_frames=SEND_WS_FRAMES)
+    camera_mode = USE_BACKEND_CAMERA if use_backend_camera is None else use_backend_camera
+    engine.start(use_camera=camera_mode, render_frames=SEND_WS_FRAMES)
     return {"status": "started", "exercise": selected_exercise}
 
 
 @app.post("/stop")
-def stop_workout(name: str = "You"):
+def stop_workout(name: str = "You", db: Session = Depends(get_db)):
     engine.stop()
 
-    players = load_players()
-    player, _ = ensure_player(players, name)
+    try:
+        clean_name = normalize_name(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # ✅ Append session history
-    player["history"].append({
-        "date": datetime.now().isoformat(),
-        "reps": engine.state["reps"],
-        "exercise": engine.state["exercise"]
-    })
+    user = create_user_if_missing(db, clean_name)
 
-    # ✅ Update XP + Level
-    player["xp"] = engine.player.xp
-    player["level"] = engine.player.level
+    add_history_item(
+        db,
+        user,
+        reps=engine.state["reps"],
+        exercise=engine.state["exercise"],
+        when=datetime.utcnow(),
+    )
 
-    # ✅ Merge badges instead of overwrite
-    existing = set(player.get("badges", []))
-    new = set(engine.unlocked_badges)
-    player["badges"] = list(existing.union(new))
+    update_user(db, user, xp=engine.player.xp, level=engine.player.level)
+    add_badges(db, user, list(engine.unlocked_badges))
+    db.commit()
+    db.refresh(user)
+    sync_engine_player(user)
 
-    save_players(players)
-
-    # ✅ Keep player_profile.json in sync so XP survives server restarts
-    engine.player.save()
+    # Keep runtime badge cache aligned with persisted badge rows.
+    engine.unlocked_badges = {badge.badge_name for badge in user.badges}
 
     return {"status": "stopped"}
 
@@ -243,42 +289,130 @@ def video_feed():
 
 
 @app.get("/leaderboard")
-def get_leaderboard():
-    players = load_players()
-
-    leaderboard = sorted(
-        [{"name": k, "xp": v["xp"]} for k, v in players.items()],
-        key=lambda x: x["xp"],
-        reverse=True
-    )[:10]
-
-    return leaderboard
+def get_leaderboard(db: Session = Depends(get_db)):
+    return get_leaderboard_payload(db, top_n=10)
 
 
 @app.get("/history")
-def get_history(name: str):
-    players = load_players()
-    return players.get(name, {}).get("history", [])
+def get_history(name: str, db: Session = Depends(get_db)):
+    try:
+        return get_user_history_payload(db, name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.post("/login")
-def login(name: str):
-    players = load_players()
+def login(name: str, db: Session = Depends(get_db)):
+    try:
+        clean_name = normalize_name(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    player, created = ensure_player(players, name)
-    if created:
-        save_players(players)
-
-    # ✅ Restore player XP/level into engine so state polling reflects correct values
-    engine.player.name = name
-    engine.player.xp = player["xp"]
-    engine.player.level = player["level"]
-    with engine._state_lock:
-        engine.state["xp"] = engine.player.xp
-        engine.state["level"] = engine.player.level
-        engine.state["xp_required"] = engine.level_system.xp_needed(engine.player.level)
+    user = create_user_if_missing(db, clean_name)
+    db.commit()
+    db.refresh(user)
+    sync_engine_player(user)
 
     return {
-        "name": name,
-        "xp": player["xp"],
-        "level": player["level"]
+        "name": user.name,
+        "xp": int(user.xp or 0),
+        "level": int(user.level or 1)
+    }
+
+
+@app.get("/users")
+def list_users(db: Session = Depends(get_db)):
+    return list_users_payload(db)
+
+
+@app.get("/users/{name}")
+def get_user(name: str, db: Session = Depends(get_db)):
+    try:
+        user = get_user_by_name(db, name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"name": user.name, **user_to_dict(user, include_history=True)}
+
+
+@app.post("/users/{name}")
+def create_user(name: str, data: Optional[UserData] = None, db: Session = Depends(get_db)):
+    try:
+        clean_name = normalize_name(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    existing = get_user_by_name(db, clean_name)
+    if existing:
+        raise HTTPException(status_code=409, detail="User already exists")
+
+    user = create_user_if_missing(db, clean_name)
+    if data is not None:
+        validate_user_numbers(xp=data.xp, level=data.level)
+        update_user(db, user, xp=data.xp, level=data.level)
+        set_user_badges(db, user, data.badges)
+        try:
+            for item in data.history:
+                parsed_date = parse_history_date(item.date)
+                add_history_item(db, user, reps=item.reps, exercise=item.exercise, when=parsed_date)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    db.commit()
+    db.refresh(user)
+    return {"name": user.name, **user_to_dict(user, include_history=True)}
+
+
+@app.put("/users/{name}")
+def upsert_user(name: str, patch: UserPatch, db: Session = Depends(get_db)):
+    try:
+        clean_name = normalize_name(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    user = create_user_if_missing(db, clean_name)
+
+    if patch.xp is not None or patch.level is not None:
+        validate_user_numbers(xp=patch.xp, level=patch.level)
+        update_user(db, user, xp=patch.xp, level=patch.level)
+
+    if patch.badges is not None:
+        set_user_badges(db, user, patch.badges)
+
+    if patch.history is not None:
+        for row in list(user.history):
+            db.delete(row)
+
+        try:
+            for item in patch.history:
+                parsed_date = parse_history_date(item.date)
+                add_history_item(db, user, reps=item.reps, exercise=item.exercise, when=parsed_date)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    db.commit()
+    db.refresh(user)
+    return {"name": user.name, **user_to_dict(user, include_history=True)}
+
+
+@app.delete("/users/{name}")
+def delete_user(name: str, db: Session = Depends(get_db)):
+    try:
+        user = get_user_by_name(db, name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    deleted_name = user.name
+    deleted_xp = int(user.xp or 0)
+    db.delete(user)
+    db.commit()
+
+    return {
+        "deleted": deleted_name,
+        "xp": deleted_xp,
     }

@@ -109,6 +109,28 @@ body {
   border-radius: 14px;
   padding: 8px 10px;
   background: rgba(20, 30, 58, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.logout-btn {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-family: "Outfit", sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.logout-btn:hover {
+  border-color: rgba(255, 120, 106, 0.8);
+  transform: translateY(-1px);
 }
 
 .pill-label {

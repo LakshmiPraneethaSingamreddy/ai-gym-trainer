@@ -139,9 +139,11 @@ class WorkoutEngine:
 
                 self.last_rep_count = reps
 
+            best_score = score.get("final_score", 0) if isinstance(score, dict) else 0
+
             new_badges = self.badge_system.evaluate({
                 "reps": reps,
-                "score": score
+                "best_score": best_score
             })
 
             if new_badges:
