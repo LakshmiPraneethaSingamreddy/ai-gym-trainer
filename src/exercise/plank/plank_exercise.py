@@ -10,7 +10,7 @@ class PlankExercise(BaseExercise):
     FEEDBACK_STATES = ["HOLDING"]
 
     def __init__(self):
-        super().__init__("Plank")
+        super().__init__("Low Plank")
         self.state_machine = PlankStateMachine()
         self.timer = PlankTimer()
         self.validator = PlankFormValidator()

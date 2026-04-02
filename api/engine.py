@@ -127,9 +127,9 @@ class WorkoutEngine:
             self.session.update(reps=reps, score=score, feedback=feedback)
 
             # XP only on newly completed reps.
-            # Plank reports hold time, so award XP only on slower 5-second milestones
+            # Low Plank reports hold time, so award XP only on slower 5-second milestones
             # to keep progression comparable to rep-based exercises.
-            progress_value = int(reps // 5) if exercise.name == "Plank" else reps
+            progress_value = int(reps // 5) if exercise.name == "Low Plank" else reps
             if progress_value > self.last_rep_count:
                 final_score = (
                     score.get("final_score", 0) if isinstance(score, dict) else 0

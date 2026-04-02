@@ -9,7 +9,7 @@ class PushupExercise(BaseExercise):
     FEEDBACK_STATES = ["DOWN"]
 
     def __init__(self):
-        super().__init__("Pushup")
+        super().__init__("Knee/Regular Pushups")
         self.state_machine = PushupStateMachine()
         self.rep_counter = PushupRepCounter()
         self.validator = PushupFormValidator()

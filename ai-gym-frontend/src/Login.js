@@ -5,19 +5,19 @@ function Login({ setUsername }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = () => {
+  const handleSignIn = () => {
     if (!name.trim()) {
-      setError("Please enter a username.");
+      setError("Please enter a username to sign up or sign in.");
       return;
     }
 
-  fetch(apiUrl(`/login?name=${encodeURIComponent(name)}`), {
+  fetch(apiUrl(`/signin?name=${encodeURIComponent(name)}`), {
       method: "POST"
     })
       .then(async (res) => {
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data?.detail || "Login failed");
+          throw new Error(data?.detail || "Sign in failed");
         }
         return data;
       })
@@ -26,24 +26,24 @@ function Login({ setUsername }) {
         localStorage.setItem("username", data.name);
         setUsername(data.name);
       })
-      .catch(err => setError(err.message || "Unable to login right now."));
+      .catch(err => setError(err.message || "Unable to sign in right now."));
   };
 
   return (
     <div className="login">
-      <h2>Login</h2>
+      <h2>Sign Up / Sign In</h2>
       <input
         type="text"
-        placeholder="Enter username"
+        placeholder="Choose or enter username"
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
-            handleLogin();
+            handleSignIn();
           }
         }}
       />
-      <button onClick={handleLogin}>Login</button>
+      <button onClick={handleSignIn}>Submit</button>
       {error ? <p style={{ color: "#b00020", marginTop: "10px" }}>{error}</p> : null}
     </div>
   );

@@ -24,12 +24,12 @@ class PushupFormValidator:
         hip = AngleCalculator.hip_angle(landmarks, side)
 
         if elbow > 138:
-            feedback.append("Go lower in your pushup")
+            feedback.append("Lower your body down more 📉")
 
         if hip < 145:
-            feedback.append("Keep your hips straight")
+            feedback.append("Keep those hips aligned with your body 📍")
 
         if not feedback:
-            feedback.append("Good form ✅")
+            feedback.append("Perfect pushup form! 🚀")
 
         return feedback

@@ -22,17 +22,18 @@ class LungeFormValidator:
 
         # Depth
         if knee_angle > 118:
-            self.feedback.append("Go deeper into the lunge")
+            self.feedback.append("Lunge lower for better form 🦵")
 
         # Knee alignment (rough inward collapse check)
-        if knee["x"] < ankle["x"] - 0.05:
-            self.feedback.append("Keep your front knee aligned over your foot")
+        # Loosened threshold to 0.12 to allow natural knee position variance
+        if knee["x"] < ankle["x"] - 0.12:
+            self.feedback.append("Front knee tracking over your toes ✨")
 
         # Upright torso
         if torso_angle < 145:
-            self.feedback.append("Keep your torso more upright")
+            self.feedback.append("Keep your torso more upright 🏋️")
 
         if not self.feedback:
-            self.feedback.append("Good lunge form ✅")
+            self.feedback.append("Beautiful lunge technique! ⭐")
 
         return self.feedback

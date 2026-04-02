@@ -22,19 +22,19 @@ class SquatFormValidator:
         back_angle = AngleCalculator.back_angle(landmarks)
 
         if back_angle > 34:
-            self.feedback.append("Keep your back straighter")
+            self.feedback.append("Straighten that back a bit more 💪")
 
         # ---- Form Rules ----
 
         # Depth check
         if knee_angle > 108:
-            self.feedback.append("Go deeper into the squat")
+            self.feedback.append("Lower down further for a deeper squat ⬇️")
 
         # Hip hinge
         if hip_angle > 165:
-            self.feedback.append("Sit back more — hinge at the hips")
+            self.feedback.append("Push those hips back more 🔙")
 
         if not self.feedback:
-            self.feedback.append("Good form ✅")
+            self.feedback.append("Excellent squat form! 🎯")
 
         return self.feedback

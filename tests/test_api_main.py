@@ -23,6 +23,7 @@ class DummyLevelSystem:
 
 class DummyEngine:
     def __init__(self):
+        self.running = False
         self.player = DummyPlayer()
         self.level_system = DummyLevelSystem()
         self._state_lock = threading.Lock()
@@ -81,10 +82,10 @@ class TestApiMainIntegration:
         monkeypatch.setattr(main, "engine", DummyEngine())
         return player_file
 
-    def test_login_creates_player_and_updates_engine_state(self, tmp_path, monkeypatch):
+    def test_signin_creates_player_and_updates_engine_state(self, tmp_path, monkeypatch):
         player_file = self._set_temp_player_file(tmp_path, monkeypatch)
 
-        response = self.client.post("/login", params={"name": "Alice"})
+        response = self.client.post("/signin", params={"name": "Alice"})
 
         assert response.status_code == 200
         payload = response.json()
@@ -115,7 +116,7 @@ class TestApiMainIntegration:
         player_file = self._set_temp_player_file(tmp_path, monkeypatch)
         engine = main.engine
         engine.state["reps"] = 12
-        engine.state["exercise"] = "Plank"
+        engine.state["exercise"] = "Low Plank"
         engine.player.xp = 77
         engine.player.level = 2
         engine.unlocked_badges = {"first_workout"}
@@ -131,4 +132,33 @@ class TestApiMainIntegration:
         assert "first_workout" in saved["Nina"]["badges"]
         assert len(saved["Nina"]["history"]) == 1
         assert saved["Nina"]["history"][0]["reps"] == 12
-        assert saved["Nina"]["history"][0]["exercise"] == "Plank"
+        assert saved["Nina"]["history"][0]["exercise"] == "Low Plank"
+
+    def test_signout_returns_signed_out_without_active_workout(self, tmp_path, monkeypatch):
+        self._set_temp_player_file(tmp_path, monkeypatch)
+
+        response = self.client.post("/signout", params={"name": "Maya"})
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "signed_out"}
+
+    def test_signout_stops_active_workout_and_persists_progress(self, tmp_path, monkeypatch):
+        player_file = self._set_temp_player_file(tmp_path, monkeypatch)
+        engine = main.engine
+        engine.running = True
+        engine.state["reps"] = 9
+        engine.state["exercise"] = "Squat"
+        engine.player.xp = 42
+        engine.player.level = 2
+
+        response = self.client.post("/signout", params={"name": "Maya"})
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "signed_out"}
+
+        saved = json.loads(player_file.read_text(encoding="utf-8"))
+        assert saved["Maya"]["xp"] == 42
+        assert saved["Maya"]["level"] == 2
+        assert len(saved["Maya"]["history"]) == 1
+        assert saved["Maya"]["history"][0]["reps"] == 9
+        assert saved["Maya"]["history"][0]["exercise"] == "Squat"

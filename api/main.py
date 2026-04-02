@@ -380,8 +380,10 @@ def get_history(name: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.post("/signup")
+@app.post("/signin")
 @app.post("/login")
-def login(name: str, db: Session = Depends(get_db)):
+def signup_signin(name: str, db: Session = Depends(get_db)):
     try:
         clean_name = normalize_name(name)
     except ValueError as exc:
@@ -405,6 +407,21 @@ def login(name: str, db: Session = Depends(get_db)):
         "xp": int(user.xp or 0),
         "level": int(user.level or 1)
     }
+
+
+@app.post("/signout")
+@app.post("/logout")
+def signout(name: str = "You", db: Session = Depends(get_db)):
+    try:
+        clean_name = normalize_name(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # Persist workout progress if the user logs out while a session is active.
+    if engine.running:
+        stop_workout(name=clean_name, db=db)
+
+    return {"status": "signed_out"}
 
 
 @app.get("/users")

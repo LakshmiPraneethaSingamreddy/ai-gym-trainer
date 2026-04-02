@@ -367,9 +367,17 @@ function App() {
   const xpPercent = state.xp_required
     ? (state.xp / state.xp_required) * 100
     : 0;
-  const isPlankActive = (state.exercise || selectedExercise) === "Plank";
+  const isPlankActive = (state.exercise || selectedExercise) === "Low Plank";
 
-  const exercises = ["Squat", "Pushup", "Lunge", "Plank"];
+  const exercises = ["Squat", "Knee/Regular Pushups", "Lunge", "Low Plank"];
+
+  // Map exercises to camera positioning guidance
+  const cameraPosGuide = {
+    "Squat": "Face camera sideways (profile view)",
+    "Knee/Regular Pushups": "Face camera sideways (profile view)",
+    "Lunge": "Face camera front-on (frontal view)",
+    "Low Plank": "Face camera sideways (profile view)",
+  };
 
   const startWorkout = async () => {
     const myStartSequence = ++startSequenceRef.current;
@@ -431,13 +439,11 @@ function App() {
     }
   };
 
-  const handleLogout = async () => {
-    if (isWorkoutActive) {
-      try {
-        await fetch(apiUrl(`/stop?name=${username}`), { method: "POST" });
-      } catch (error) {
-        console.error("Logout stop error:", error);
-      }
+  const handleSignout = async () => {
+    try {
+      await fetch(apiUrl(`/signout?name=${username}`), { method: "POST" });
+    } catch (error) {
+      console.error("Sign out error:", error);
     }
 
     stopWebRTC();
@@ -473,8 +479,8 @@ function App() {
             <span className="pill-label">Athlete: </span>
             <strong>{username}</strong>
           </div>
-          <button type="button" className="logout-btn" onClick={handleLogout}>
-            Logout
+          <button type="button" className="logout-btn" onClick={handleSignout}>
+            Sign Out
           </button>
         </div>
       </header>
@@ -555,11 +561,11 @@ function App() {
         <aside className="panel">
           <div className="card current-exercise">
             <h2>{state.exercise || selectedExercise}</h2>
-            <p>Current movement focus</p>
+            <p>{cameraPosGuide[state.exercise || selectedExercise] || "Face camera for detection"}</p>
           </div>
 
           <div className="card reps-card">
-            <h3>{isPlankActive ? "Plank Timer" : "Reps"}</h3>
+            <h3>{isPlankActive ? "Low Plank Timer" : "Reps"}</h3>
             <p className="big-text">{isPlankActive ? formatDuration(state.reps) : state.reps}</p>
           </div>
 
@@ -576,7 +582,7 @@ function App() {
 
           <div className="card feedback-card">
             <h3>Feedback</h3>
-            <p>{state.feedback || "Good form 👍"}</p>
+            <p>{state.feedback || "Keep it up! 🔥"}</p>
           </div>
 
           <div className="card leaderboard">

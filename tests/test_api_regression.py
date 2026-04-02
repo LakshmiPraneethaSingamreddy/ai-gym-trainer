@@ -48,10 +48,10 @@ def _cleanup_test_client(tmp_dir, test_engine, original_engine, original_session
     tmp_dir.cleanup()
 
 
-def test_login_creates_user_and_returns_defaults():
+def test_signin_creates_user_and_returns_defaults():
     client, tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file = _build_test_client()
     try:
-        response = client.post("/login", params={"name": "demo-login-user"})
+        response = client.post("/signin", params={"name": "demo-login-user"})
         assert response.status_code == 200
 
         payload = response.json()
@@ -65,7 +65,7 @@ def test_login_creates_user_and_returns_defaults():
 def test_upsert_updates_xp_and_level():
     client, tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file = _build_test_client()
     try:
-        client.post("/login", params={"name": "demo-update-user"})
+        client.post("/signin", params={"name": "demo-update-user"})
 
         response = client.put(
             "/users/demo-update-user",
@@ -90,7 +90,7 @@ def test_history_retrieval_returns_inserted_items():
             json={
                 "history": [
                     {"date": "2026-03-30T10:00:00", "reps": 12, "exercise": "Squat"},
-                    {"date": "2026-03-30T11:00:00", "reps": 10, "exercise": "Push-Up"},
+                    {"date": "2026-03-30T11:00:00", "reps": 10, "exercise": "Knee/Regular Pushups"},
                 ]
             },
         )
@@ -102,6 +102,6 @@ def test_history_retrieval_returns_inserted_items():
         history = history_response.json()
         assert len(history) == 2
         assert history[0]["exercise"] == "Squat"
-        assert history[1]["exercise"] == "Push-Up"
+        assert history[1]["exercise"] == "Knee/Regular Pushups"
     finally:
         _cleanup_test_client(tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file)

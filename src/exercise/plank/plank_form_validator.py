@@ -21,17 +21,17 @@ class PlankFormValidator:
 
         # Ideal plank ≈ 170–180 degrees
         if body_angle < 155:
-            self.feedback.append("Keep your body in a straight line")
+            self.feedback.append("Keep your whole body in a strong line 💪")
 
         # Hip position check (avoid sagging)
         if hip["y"] > shoulder["y"] + 0.06:
-            self.feedback.append("Don't let your hips sag")
+            self.feedback.append("Hips up! No sagging 📍")
 
         # Avoid piking
         if hip["y"] < shoulder["y"] - 0.06:
-            self.feedback.append("Lower your hips slightly")
+            self.feedback.append("Lower those hips just a bit ⬇️")
 
         if not self.feedback:
-            self.feedback.append("Strong plank posture 💪")
+            self.feedback.append("Rock-solid plank hold! 🔥")
 
         return self.feedback
