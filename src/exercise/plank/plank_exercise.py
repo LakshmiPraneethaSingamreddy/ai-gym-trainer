@@ -7,7 +7,7 @@ from src.exercise.plank.plank_performance_scorer import PlankPerformanceScorer
 
 
 class PlankExercise(BaseExercise):
-    FEEDBACK_STATES = ["HOLD"]
+    FEEDBACK_STATES = ["HOLDING"]
 
     def __init__(self):
         super().__init__("Plank")

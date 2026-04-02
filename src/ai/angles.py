@@ -1,5 +1,6 @@
 import math
 
+
 class AngleCalculator:
     @staticmethod
     def calculate_angle(a, b, c):
@@ -19,7 +20,6 @@ class AngleCalculator:
 
         return angle
 
-
     @staticmethod
     def back_angle(landmarks, side="left"):
         """
@@ -29,24 +29,23 @@ class AngleCalculator:
         """
         if side == "left":
             shoulder = landmarks[11]  # LEFT_SHOULDER
-            hip = landmarks[23]       # LEFT_HIP
+            hip = landmarks[23]  # LEFT_HIP
         else:
             shoulder = landmarks[12]
             hip = landmarks[24]
 
         dx = shoulder["x"] - hip["x"]
-        dy = hip["y"] - shoulder["y"]   # inverted because y grows downward
+        dy = hip["y"] - shoulder["y"]  # inverted because y grows downward
 
         angle = math.degrees(math.atan2(abs(dx), abs(dy)))
         return angle
-    
-    
+
     @staticmethod
     def knee_angle(landmarks, side="left"):
         if side == "left":
-            hip = landmarks[23]   # LEFT_HIP
+            hip = landmarks[23]  # LEFT_HIP
             knee = landmarks[25]  # LEFT_KNEE
-            ankle = landmarks[27] # LEFT_ANKLE
+            ankle = landmarks[27]  # LEFT_ANKLE
         else:
             hip = landmarks[24]
             knee = landmarks[26]
@@ -57,22 +56,22 @@ class AngleCalculator:
     @staticmethod
     def hip_angle(landmarks, side="left"):
         if side == "left":
-            shoulder = landmarks[11] # LEFT_SHOULDER
-            hip = landmarks[23]      # LEFT_HIP
-            knee = landmarks[25]     # LEFT_KNEE
+            shoulder = landmarks[11]  # LEFT_SHOULDER
+            hip = landmarks[23]  # LEFT_HIP
+            knee = landmarks[25]  # LEFT_KNEE
         else:
             shoulder = landmarks[12]
             hip = landmarks[24]
             knee = landmarks[26]
 
         return AngleCalculator.calculate_angle(shoulder, hip, knee)
-    
+
     @staticmethod
     def elbow_angle(landmarks, side="left"):
         if side == "left":
-            shoulder = landmarks[11] # LEFT_SHOULDER
-            elbow = landmarks[13]    # LEFT_ELBOW
-            wrist = landmarks[15]    # LEFT_WRIST
+            shoulder = landmarks[11]  # LEFT_SHOULDER
+            elbow = landmarks[13]  # LEFT_ELBOW
+            wrist = landmarks[15]  # LEFT_WRIST
         else:
             shoulder = landmarks[12]
             elbow = landmarks[14]

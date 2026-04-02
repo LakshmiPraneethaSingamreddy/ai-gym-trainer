@@ -1,5 +1,6 @@
 from src.ai.angles import AngleCalculator
 
+
 class LungeFormValidator:
     def __init__(self):
         self.feedback = []
@@ -10,7 +11,7 @@ class LungeFormValidator:
         if not landmarks:
             return ["No pose detected"]
 
-        knee = landmarks[25]    # LEFT_KNEE
+        knee = landmarks[25]  # LEFT_KNEE
         ankle = landmarks[27]  # LEFT_ANKLE
 
         # --- Angles ---
@@ -20,7 +21,7 @@ class LungeFormValidator:
         # --- Rules ---
 
         # Depth
-        if knee_angle > 110:
+        if knee_angle > 118:
             self.feedback.append("Go deeper into the lunge")
 
         # Knee alignment (rough inward collapse check)
@@ -28,11 +29,10 @@ class LungeFormValidator:
             self.feedback.append("Keep your front knee aligned over your foot")
 
         # Upright torso
-        if torso_angle < 150:
+        if torso_angle < 145:
             self.feedback.append("Keep your torso more upright")
 
         if not self.feedback:
             self.feedback.append("Good lunge form ✅")
 
         return self.feedback
-

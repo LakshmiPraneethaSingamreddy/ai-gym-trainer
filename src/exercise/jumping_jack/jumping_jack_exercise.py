@@ -2,8 +2,12 @@ import time
 from src.exercise.base_exercise import BaseExercise
 from src.exercise.jumping_jack.jumping_jack_state_machine import JumpingJackStateMachine
 from src.exercise.jumping_jack.jumping_jack_rep_counter import JumpingJackRepCounter
-from src.exercise.jumping_jack.jumping_jack_form_validator import JumpingJackFormValidator
-from src.exercise.jumping_jack.jumping_jack_performance_scorer import JumpingJackPerformanceScorer
+from src.exercise.jumping_jack.jumping_jack_form_validator import (
+    JumpingJackFormValidator,
+)
+from src.exercise.jumping_jack.jumping_jack_performance_scorer import (
+    JumpingJackPerformanceScorer,
+)
 
 
 class JumpingJackExercise(BaseExercise):

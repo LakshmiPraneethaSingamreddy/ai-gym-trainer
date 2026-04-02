@@ -22,10 +22,11 @@ from src.gamification.leaderboard_system import LeaderboardSystem
 # choose exercise
 ACTIVE_EXERCISE = "Squat"  # Options: "Squat", "Pushup", "Lunge", "Plank", "JumpingJack"
 
+
 def main():
     cam = None
     logger = None
-    
+
     try:
         cam = Camera()
         detector = PoseDetector()
@@ -64,7 +65,7 @@ def main():
 
                 detector.process(frame)
                 landmarks = detector.extract_landmarks(frame)
-                
+
                 if landmarks:
                     state = exercise.update(landmarks)
                     reps = exercise.count_rep(state.name)
@@ -73,13 +74,11 @@ def main():
                     print("Exercise:", exercise.name)
                     print("State:", state.name)
                     print("Reps:", reps)
-                    
+
                     feedback = None
                     if exercise.allow_feedback(state.name):
                         feedback = feedback_controller.update(
-                            exercise,
-                            state.name,
-                            exercise.validate_form(landmarks)
+                            exercise, state.name, exercise.validate_form(landmarks)
                         )
 
                     if feedback:
@@ -87,7 +86,7 @@ def main():
 
                     if score:
                         print("Score:", score)
-                    
+
                     # Update session ONLY during workout
                     session.update(reps=reps, score=score, feedback=feedback)
 
@@ -108,16 +107,16 @@ def main():
                         score=score,
                         level=player.level,
                         xp=player.xp,
-                        xp_required=level_system.xp_needed(player.level)
+                        xp_required=level_system.xp_needed(player.level),
                     )
 
                 logger.log(landmarks)
                 frame = detector.draw_landmarks(frame)
 
                 cv2.imshow("AI Gym Trainer", frame)
-                
+
                 key = cv2.waitKey(1) & 0xFF
-                if key == ord('q'):
+                if key == ord("q"):
                     break
 
             except Exception as e:
@@ -126,7 +125,7 @@ def main():
 
         # Finalizing workout and displaying the summary
         cv2.destroyWindow("AI Gym Trainer")
-        
+
         summary = session.get_summary(exercise.name)
 
         # Updating stats after workout
@@ -144,9 +143,7 @@ def main():
             hud.show_badges(new_badges)
 
         leaderboard.submit_workout(
-            player_name=player.name,
-            summary=summary,
-            xp_gained=live_xp_awarded
+            player_name=player.name, summary=summary, xp_gained=live_xp_awarded
         )
 
         final_leaderboard = leaderboard.get_weekly_leaderboard()
@@ -160,22 +157,20 @@ def main():
             frame = cam.read()
             if frame is not None:
                 summary_frame = frame
-            
+
             if summary_frame is not None:
                 display_frame = summary_ui.draw(
-                    summary_frame,
-                    summary,
-                    final_leaderboard
+                    summary_frame, summary, final_leaderboard
                 )
                 cv2.imshow("Workout Summary", display_frame)
-            
+
             key = cv2.waitKey(30) & 0xFF
-            if key == ord('q') or key == 27:  # 'q' or ESC
+            if key == ord("q") or key == 27:  # 'q' or ESC
                 break
 
     except Exception as e:
         print(f"Critical error: {e}")
-    
+
     finally:
         # Ensure cleanup always happens
         if logger:
@@ -183,6 +178,7 @@ def main():
         if cam:
             cam.release()
         cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()

@@ -1,9 +1,11 @@
 from enum import Enum
 from src.ai.angles import AngleCalculator
 
+
 class PushupState(Enum):
     UP = 1
     DOWN = 2
+
 
 class PushupStateMachine:
     def __init__(self):
@@ -11,11 +13,17 @@ class PushupStateMachine:
         self.reached_bottom = False
         self.last_elbow_angle = None
         self.min_elbow_angle = 180
+        self.is_knee_pushup = False
+        self.min_torso_angle = 18
 
         # Tuned thresholds for real-time webcam noise.
-        self.bottom_threshold = 95
-        self.top_threshold = 150
-        self.direction_delta = 2
+        # Regular pushups usually read a little shallower than knee pushups,
+        # so we keep two depth gates to avoid missing valid reps.
+        self.regular_bottom_threshold = 120
+        self.knee_bottom_threshold = 96
+        self.top_threshold = 160
+        self.knee_mode_knee_angle = 160
+        self.direction_delta = 3
 
     def _side_visibility(self, landmarks, side):
         if side == "left":
@@ -31,9 +39,24 @@ class PushupStateMachine:
         right_elbow_angle = AngleCalculator.elbow_angle(landmarks, "right")
         left_vis = self._side_visibility(landmarks, "left")
         right_vis = self._side_visibility(landmarks, "right")
+        left_knee_angle = AngleCalculator.knee_angle(landmarks, "left")
+        right_knee_angle = AngleCalculator.knee_angle(landmarks, "right")
 
         # Use the more visible arm to reduce occlusion noise.
-        elbow_angle = left_elbow_angle if left_vis >= right_vis else right_elbow_angle
+        side = "left" if left_vis >= right_vis else "right"
+        elbow_angle = left_elbow_angle if side == "left" else right_elbow_angle
+        knee_angle = left_knee_angle if side == "left" else right_knee_angle
+        torso_angle = AngleCalculator.back_angle(landmarks, side)
+
+        # Keep the knee-pushup signal available without making it part of rep counting.
+        self.is_knee_pushup = knee_angle < self.knee_mode_knee_angle
+
+        if torso_angle < self.min_torso_angle:
+            self.state = PushupState.UP
+            self.reached_bottom = False
+            self.min_elbow_angle = 180
+            self.last_elbow_angle = elbow_angle
+            return self.state
 
         if self.last_elbow_angle is None:
             self.last_elbow_angle = elbow_angle
@@ -49,7 +72,12 @@ class PushupStateMachine:
                 self.min_elbow_angle = elbow_angle
         else:
             self.min_elbow_angle = min(self.min_elbow_angle, elbow_angle)
-            if self.min_elbow_angle < self.bottom_threshold:
+            bottom_threshold = (
+                self.knee_bottom_threshold
+                if self.is_knee_pushup
+                else self.regular_bottom_threshold
+            )
+            if self.min_elbow_angle <= bottom_threshold:
                 self.reached_bottom = True
 
             if moving_up and elbow_angle > self.top_threshold:

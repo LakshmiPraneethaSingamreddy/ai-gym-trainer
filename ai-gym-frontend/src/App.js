@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 import Login from "./Login";
+import { apiUrl, wsUrl } from "./apiConfig";
 
 // MediaPipe skeleton connections (pairs of landmark indices)
 const POSE_CONNECTIONS = [
@@ -15,6 +16,13 @@ const POSE_CONNECTIONS = [
 ];
 
 function App() {
+  const formatDuration = (secondsValue) => {
+    const totalSeconds = Math.max(0, Math.floor(Number(secondsValue) || 0));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  };
+
   const [state, setState] = useState({
     reps: 0,
     xp: 0,
@@ -80,7 +88,7 @@ function App() {
     if (!username) return;
 
     const fetchLeaderboard = () => {
-      fetch("http://127.0.0.1:8000/leaderboard")
+      fetch(apiUrl("/leaderboard"))
         .then(res => res.json())
         .then(data => setLeaderboard(data))
         .catch(err => console.error("Leaderboard error:", err));
@@ -96,7 +104,7 @@ function App() {
   useEffect(() => {
     if (!username) return;
 
-    fetch(`http://127.0.0.1:8000/history?name=${username}`)
+    fetch(apiUrl(`/history?name=${username}`))
       .then(res => res.json())
       .then(data => setHistory(data))
       .catch(err => console.error("History error:", err));
@@ -137,7 +145,7 @@ function App() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    const response = await fetch("http://127.0.0.1:8000/webrtc/offer", {
+    const response = await fetch(apiUrl("/webrtc/offer"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -167,7 +175,7 @@ function App() {
   useEffect(() => {
     if (!username) return;
 
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+    const ws = new WebSocket(wsUrl("/ws"));
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -265,13 +273,14 @@ function App() {
   const xpPercent = state.xp_required
     ? (state.xp / state.xp_required) * 100
     : 0;
+  const isPlankActive = (state.exercise || selectedExercise) === "Plank";
 
-  const exercises = ["Squat", "Pushup", "Lunge", "Plank", "JumpingJack"];
+  const exercises = ["Squat", "Pushup", "Lunge", "Plank"];
 
   const startWorkout = async () => {
     try {
       const res = await fetch(
-        `http://127.0.0.1:8000/start?exercise=${selectedExercise}&name=${username}`,
+        apiUrl(`/start?exercise=${selectedExercise}&name=${username}`),
         { method: "POST" }
       );
       if (!res.ok) {
@@ -290,14 +299,14 @@ function App() {
     stopWebRTC();
     setIsWorkoutActive(false);
     try {
-      const res = await fetch(`http://127.0.0.1:8000/stop?name=${username}`, {
+      const res = await fetch(apiUrl(`/stop?name=${username}`), {
         method: "POST"
       });
       if (!res.ok) {
         throw new Error("Failed to stop workout");
       }
 
-      const historyRes = await fetch(`http://127.0.0.1:8000/history?name=${username}`);
+      const historyRes = await fetch(apiUrl(`/history?name=${username}`));
       const data = await historyRes.json();
       setHistory(data);
     } catch (error) {
@@ -408,8 +417,8 @@ function App() {
           </div>
 
           <div className="card reps-card">
-            <h3>Reps</h3>
-            <p className="big-text">{state.reps}</p>
+            <h3>{isPlankActive ? "Plank Timer" : "Reps"}</h3>
+            <p className="big-text">{isPlankActive ? formatDuration(state.reps) : state.reps}</p>
           </div>
 
           <div className="card">
@@ -429,7 +438,7 @@ function App() {
           </div>
 
           <div className="card leaderboard">
-            <h3>Leaderboard</h3>
+            <h3>Level-wise Leaderboard</h3>
             {leaderboard.map((user, i) => (
               <div key={i} className="leaderboard-item">
                 <span>{i + 1}. {user.name}</span>

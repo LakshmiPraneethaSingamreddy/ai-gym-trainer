@@ -1,5 +1,7 @@
 # lunge_performance_scorer.py
 from src.ai.angles import AngleCalculator
+
+
 class LungePerformanceScorer:
     def __init__(self):
         self.frames = []
@@ -14,7 +16,7 @@ class LungePerformanceScorer:
             min_knee = min(self.frames)
             self.frames.clear()
             return self.score(min_knee)
-        
+
         return None
 
     def score(self, min_knee_angle):

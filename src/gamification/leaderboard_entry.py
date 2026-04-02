@@ -23,11 +23,7 @@ class LeaderboardEntry:
     # Ranking score
     # -----------------------------
     def ranking_score(self):
-        return (
-            self.reps * 0.4 +
-            self.score * 0.4 +
-            self.xp * 0.2
-        )
+        return self.reps * 0.4 + self.score * 0.4 + self.xp * 0.2
 
     def to_dict(self):
         return {
@@ -35,16 +31,13 @@ class LeaderboardEntry:
             "reps": self.reps,
             "score": self.score,
             "xp": self.xp,
-            "timestamp": self.timestamp.isoformat()
+            "timestamp": self.timestamp.isoformat(),
         }
 
     @staticmethod
     def from_dict(data):
         obj = LeaderboardEntry(
-            data["player_name"],
-            data["reps"],
-            data["score"],
-            data["xp"]
+            data["player_name"], data["reps"], data["score"], data["xp"]
         )
         obj.timestamp = datetime.fromisoformat(data["timestamp"])
         return obj

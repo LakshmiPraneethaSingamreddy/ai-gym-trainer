@@ -7,12 +7,12 @@ class FeedbackController:
     def __init__(self):
         self.pending_feedback = None
         self.frames_since_feedback = 0
-        self.MAX_WAIT_FRAMES = 45   # ~1.5 sec @30fps
+        self.MAX_WAIT_FRAMES = 45  # ~1.5 sec @30fps
 
         # ✅ NEW — display duration system
         self.display_feedback = None
         self.display_timer = 0
-        self.DISPLAY_FRAMES = 90    # show feedback ~3 seconds
+        self.DISPLAY_FRAMES = 90  # show feedback ~3 seconds
 
     def update(self, exercise, state_name, raw_feedback):
         """

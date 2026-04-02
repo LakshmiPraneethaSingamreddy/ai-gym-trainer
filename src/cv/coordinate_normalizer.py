@@ -1,6 +1,7 @@
 import math
 import mediapipe as mp
 
+
 class CoordinateNormalizer:
     def __init__(self, epsilon=1e-6):
         """
@@ -10,11 +11,7 @@ class CoordinateNormalizer:
         self.mp_pose = mp.solutions.pose
 
     def _distance(self, p1, p2):
-        return math.sqrt(
-            (p1.x - p2.x) ** 2 +
-            (p1.y - p2.y) ** 2 +
-            (p1.z - p2.z) ** 2
-        )
+        return math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2 + (p1.z - p2.z) ** 2)
 
     def normalize(self, landmarks):
         """
@@ -43,9 +40,9 @@ class CoordinateNormalizer:
 
         # ---- Step 3: Torso length (scale) ----
         torso_length = math.sqrt(
-            (shoulder_center_x - hip_center_x) ** 2 +
-            (shoulder_center_y - hip_center_y) ** 2 +
-            (shoulder_center_z - hip_center_z) ** 2
+            (shoulder_center_x - hip_center_x) ** 2
+            + (shoulder_center_y - hip_center_y) ** 2
+            + (shoulder_center_z - hip_center_z) ** 2
         )
 
         torso_length = max(torso_length, self.epsilon)

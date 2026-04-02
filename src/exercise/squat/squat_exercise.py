@@ -1,11 +1,13 @@
-from  src.exercise.base_exercise import BaseExercise
+from src.exercise.base_exercise import BaseExercise
 from .squat_state_machine import SquatStateMachine
 from .squat_rep_counter import RepCounter
 from .squat_form_validator import SquatFormValidator
 from .squat_performance_scorer import PerformanceScorer
 
+
 class SquatExercise(BaseExercise):
     FEEDBACK_STATES = ["BOTTOM"]
+
     def __init__(self):
         super().__init__("Squat")
         self.state_machine = SquatStateMachine()

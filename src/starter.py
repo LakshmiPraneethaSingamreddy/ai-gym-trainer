@@ -2,6 +2,7 @@
 import cv2
 import sys
 
+
 def check_camera():
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -15,6 +16,7 @@ def check_camera():
     print("Camera OK. Frame shape:", frame.shape)
     cap.release()
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(check_camera())

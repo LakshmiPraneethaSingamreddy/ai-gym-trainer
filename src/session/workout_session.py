@@ -50,8 +50,7 @@ class WorkoutSession:
         seconds = duration % 60
 
         avg_score = (
-            sum(self.rep_scores) / len(self.rep_scores)
-            if self.rep_scores else 0
+            sum(self.rep_scores) / len(self.rep_scores) if self.rep_scores else 0
         )
 
         best_score = max(self.rep_scores) if self.rep_scores else 0
@@ -60,9 +59,7 @@ class WorkoutSession:
         valid_feedback = [fb for fb in self.feedback_log if fb is not None]
         if valid_feedback:
             counts = Counter(valid_feedback)
-            common_feedback = [
-                fb for fb, _ in counts.most_common(2)
-            ]
+            common_feedback = [fb for fb, _ in counts.most_common(2)]
 
         return {
             "exercise": exercise_name,
@@ -70,5 +67,5 @@ class WorkoutSession:
             "avg_score": round(avg_score, 1),
             "best_score": best_score,
             "common_feedback": common_feedback,
-            "duration": f"{minutes:02}:{seconds:02}"
+            "duration": f"{minutes:02}:{seconds:02}",
         }

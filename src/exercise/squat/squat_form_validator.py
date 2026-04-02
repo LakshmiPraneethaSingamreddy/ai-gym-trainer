@@ -1,5 +1,6 @@
 from src.ai.angles import AngleCalculator
 
+
 class SquatFormValidator:
     def __init__(self):
         self.feedback = []
@@ -20,17 +21,17 @@ class SquatFormValidator:
         # Back angle (shoulder-hip-knee)
         back_angle = AngleCalculator.back_angle(landmarks)
 
-        if back_angle > 30:
+        if back_angle > 34:
             self.feedback.append("Keep your back straighter")
 
         # ---- Form Rules ----
 
         # Depth check
-        if knee_angle > 100:
+        if knee_angle > 108:
             self.feedback.append("Go deeper into the squat")
 
         # Hip hinge
-        if hip_angle > 160:
+        if hip_angle > 165:
             self.feedback.append("Sit back more — hinge at the hips")
 
         if not self.feedback:

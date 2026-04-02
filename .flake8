@@ -1,0 +1,10 @@
+[flake8]
+max-line-length = 88
+extend-ignore = E203, W503
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    node_modules,
+    build,
+    ai-gym-frontend/build

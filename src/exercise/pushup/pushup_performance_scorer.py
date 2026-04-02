@@ -1,5 +1,6 @@
 from src.ai.angles import AngleCalculator
 
+
 class PushupPerformanceScorer:
     def __init__(self):
         self.rep_scores = []

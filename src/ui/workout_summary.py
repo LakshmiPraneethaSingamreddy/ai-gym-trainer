@@ -18,7 +18,7 @@ class WorkoutSummaryUI:
                 size,
                 color,
                 2,
-                cv2.LINE_AA
+                cv2.LINE_AA,
             )
             y += line_gap
 

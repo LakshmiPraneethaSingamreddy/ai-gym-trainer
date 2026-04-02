@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class BaseExercise(ABC):
 
     FEEDBACK_STATES = []
@@ -28,6 +29,6 @@ class BaseExercise(ABC):
     def score_rep(self, landmarks, state):
         """Return rep score"""
         pass
-    
+
     def allow_feedback(self, state_name):
         return state_name in self.FEEDBACK_STATES

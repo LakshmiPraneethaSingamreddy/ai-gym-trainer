@@ -1,6 +1,7 @@
 from typing import List, Optional
 import copy
 
+
 class TemporalSmoother:
     def __init__(self, alpha: float = 0.3):
         """

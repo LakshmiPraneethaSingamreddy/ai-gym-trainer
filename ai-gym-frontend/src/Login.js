@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { apiUrl } from "./apiConfig";
 
 function Login({ setUsername }) {
   const [name, setName] = useState("");
@@ -6,7 +7,7 @@ function Login({ setUsername }) {
   const handleLogin = () => {
     if (!name) return;
 
-    fetch(`http://127.0.0.1:8000/login?name=${name}`, {
+    fetch(apiUrl(`/login?name=${name}`), {
       method: "POST"
     })
       .then(res => res.json())

@@ -31,13 +31,14 @@ def env_flag(name: str, default: str = "1") -> bool:
 
 
 SEND_WS_FRAMES = env_flag("SEND_WS_FRAMES", "1")
-USE_BACKEND_CAMERA = env_flag("USE_BACKEND_CAMERA", "1")
+USE_BACKEND_CAMERA = env_flag("USE_BACKEND_CAMERA", "0")
 pcs = set()
 
 
 class RTCOffer(BaseModel):
     sdp: str
     type: str
+
 
 PLAYER_FILE = "src/data/players.json"
 
@@ -62,12 +63,7 @@ def save_players(data):
 
 
 def default_player():
-    return {
-        "xp": 0,
-        "level": 1,
-        "badges": [],
-        "history": []
-    }
+    return {"xp": 0, "level": 1, "badges": [], "history": []}
 
 
 def ensure_player(players, name):
@@ -97,11 +93,13 @@ def stop_workout(name: str = "You"):
     player, _ = ensure_player(players, name)
 
     # ✅ Append session history
-    player["history"].append({
-        "date": datetime.now().isoformat(),
-        "reps": engine.state["reps"],
-        "exercise": engine.state["exercise"]
-    })
+    player["history"].append(
+        {
+            "date": datetime.now().isoformat(),
+            "reps": engine.state["reps"],
+            "exercise": engine.state["exercise"],
+        }
+    )
 
     # ✅ Update XP + Level
     player["xp"] = engine.player.xp
@@ -145,8 +143,9 @@ async def webrtc_offer(offer: RTCOffer):
             while True:
                 try:
                     frame = await track.recv()
-                    # If processing is behind, drop stale frames before expensive conversion.
-                    if engine.has_pending_external_frame():
+                    # Drop stale frames when processing falls behind.
+                    has_pending_frame = engine.has_pending_external_frame()
+                    if has_pending_frame:
                         continue
                     image = frame.to_ndarray(format="bgr24")
                     engine.ingest_external_frame(image)
@@ -181,7 +180,9 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Wait for a new frame without blocking the async event loop
-            await loop.run_in_executor(None, lambda: engine._frame_event.wait(timeout=0.1))
+            await loop.run_in_executor(
+                None, lambda: engine._frame_event.wait(timeout=0.1)
+            )
             engine._frame_event.clear()
 
             raw_frame = engine.raw_frame
@@ -190,21 +191,27 @@ async def websocket_endpoint(websocket: WebSocket):
                 frame_b64 = None
                 if SEND_WS_FRAMES:
                     blank = np.zeros((480, 640, 3), dtype=np.uint8)
-                    cv2.putText(blank, "Camera Stopped", (150, 240),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    _, buffer = cv2.imencode('.jpg', blank, encode_params)
-                    frame_b64 = base64.b64encode(buffer).decode('utf-8')
-                await websocket.send_text(json.dumps({
-                    "frame": frame_b64,
-                    "landmarks": []
-                }))
+                    cv2.putText(
+                        blank,
+                        "Camera Stopped",
+                        (150, 240),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 0, 255),
+                        2,
+                    )
+                    _, buffer = cv2.imencode(".jpg", blank, encode_params)
+                    frame_b64 = base64.b64encode(buffer).decode("utf-8")
+                await websocket.send_text(
+                    json.dumps({"frame": frame_b64, "landmarks": []})
+                )
                 await asyncio.sleep(0.1)
                 continue
 
             frame_b64 = None
             if SEND_WS_FRAMES:
-                _, buffer = cv2.imencode('.jpg', raw_frame, encode_params)
-                frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                _, buffer = cv2.imencode(".jpg", raw_frame, encode_params)
+                frame_b64 = base64.b64encode(buffer).decode("utf-8")
 
             with engine._state_lock:
                 state_snapshot = engine.state.copy()
@@ -215,11 +222,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
             state_snapshot["badges"] = new_badges
 
-            payload = json.dumps({
-                "frame": frame_b64,
-                "landmarks": engine.display_landmarks,
-                **state_snapshot
-            })
+            payload = json.dumps(
+                {
+                    "frame": frame_b64,
+                    "landmarks": engine.display_landmarks,
+                    **state_snapshot,
+                }
+            )
             await websocket.send_text(payload)
 
     except WebSocketDisconnect:
@@ -238,7 +247,7 @@ def video_feed():
             "Pragma": "no-cache",
             "Expires": "0",
             "X-Accel-Buffering": "no",
-        }
+        },
     )
 
 
@@ -249,7 +258,7 @@ def get_leaderboard():
     leaderboard = sorted(
         [{"name": k, "xp": v["xp"]} for k, v in players.items()],
         key=lambda x: x["xp"],
-        reverse=True
+        reverse=True,
     )[:10]
 
     return leaderboard
@@ -259,6 +268,7 @@ def get_leaderboard():
 def get_history(name: str):
     players = load_players()
     return players.get(name, {}).get("history", [])
+
 
 @app.post("/login")
 def login(name: str):
@@ -277,8 +287,4 @@ def login(name: str):
         engine.state["level"] = engine.player.level
         engine.state["xp_required"] = engine.level_system.xp_needed(engine.player.level)
 
-    return {
-        "name": name,
-        "xp": player["xp"],
-        "level": player["level"]
-    }
+    return {"name": name, "xp": player["xp"], "level": player["level"]}

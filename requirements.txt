@@ -4,6 +4,7 @@ numpy
 pandas
 streamlit
 fastapi
+httpx
 uvicorn
 websockets
 aiortc

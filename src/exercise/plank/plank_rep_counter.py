@@ -1,6 +1,7 @@
 # plank_rep_counter.py
 import time
 
+
 class PlankTimer:
     def __init__(self):
         self.start = None
@@ -12,12 +13,18 @@ class PlankTimer:
         self.total = 0
 
     def update(self, state):
+        now = time.time()
+
         if state == "HOLDING":
-            if not self.start:
-                self.start = time.time()
+            if self.start is None:
+                self.start = now
         else:
-            if self.start:
-                self.total += time.time() - self.start
+            if self.start is not None:
+                self.total += now - self.start
                 self.start = None
 
-        return round(self.total, 1)
+        active_total = self.total
+        if self.start is not None:
+            active_total += now - self.start
+
+        return round(active_total, 1)

@@ -28,6 +28,3 @@ class LungeExercise(BaseExercise):
 
     def score_rep(self, landmarks, state):
         return self.scorer.update(landmarks, state)
-
-
-
