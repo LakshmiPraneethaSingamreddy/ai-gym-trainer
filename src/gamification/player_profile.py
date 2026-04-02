@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime, date
 
+
 class PlayerProfile:
     """
     Stores long-term user progress.
@@ -20,7 +21,7 @@ class PlayerProfile:
         self.streak_days = 0
         self.last_workout_date = None
         self.badges = []
-        
+
         self.load()
 
     # ----------------------------------
@@ -58,9 +59,7 @@ class PlayerProfile:
             self.streak_days = 1
 
         else:
-            last_date = datetime.strptime(
-                self.last_workout_date, "%Y-%m-%d"
-            ).date()
+            last_date = datetime.strptime(self.last_workout_date, "%Y-%m-%d").date()
 
             diff = (today - last_date).days
 
@@ -91,5 +90,3 @@ class PlayerProfile:
 
         self.update_streak()
         self.save()
-
-    

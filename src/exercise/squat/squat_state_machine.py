@@ -1,11 +1,13 @@
 from enum import Enum
 from src.ai.angles import AngleCalculator
 
+
 class SquatState(Enum):
     STANDING = 1
     DESCENDING = 2
     BOTTOM = 3
     ASCENDING = 4
+
 
 class SquatStateMachine:
     def __init__(self):
@@ -31,10 +33,12 @@ class SquatStateMachine:
                 self.min_knee_angle_in_descent = knee_angle
 
         elif self.state == SquatState.DESCENDING:
-            self.min_knee_angle_in_descent = min(self.min_knee_angle_in_descent, knee_angle)
-            if knee_angle < 95:
+            self.min_knee_angle_in_descent = min(
+                self.min_knee_angle_in_descent, knee_angle
+            )
+            if knee_angle < 100:
                 self.state = SquatState.BOTTOM
-            elif moving_up and self.min_knee_angle_in_descent < 105:
+            elif moving_up and self.min_knee_angle_in_descent < 112:
                 # Low-FPS case: bottom frame was skipped, but user went deep enough
                 self.state = SquatState.ASCENDING
 

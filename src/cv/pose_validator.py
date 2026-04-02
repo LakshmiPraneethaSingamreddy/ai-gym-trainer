@@ -1,8 +1,11 @@
 from typing import List
 from mediapipe.python.solutions.pose import PoseLandmark
 
+
 class PoseValidator:
-    def __init__(self, visibility_threshold: float = 0.25, max_invalid_frames: int = 10):
+    def __init__(
+        self, visibility_threshold: float = 0.25, max_invalid_frames: int = 10
+    ):
         self.visibility_threshold = visibility_threshold  # Balanced
         self.max_invalid_frames = max_invalid_frames  # Reasonable tolerance
         self.invalid_frame_count = 0

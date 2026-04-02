@@ -20,4 +20,3 @@ class JumpingJackFormValidator:
             feedback.append("Good jumping jack form 👍")
 
         return feedback
-

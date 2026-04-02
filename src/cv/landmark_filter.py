@@ -3,6 +3,7 @@
 from typing import List, Optional
 import copy
 
+
 class LandmarkFilter:
     def __init__(self, visibility_threshold: float = 0.5):
         """

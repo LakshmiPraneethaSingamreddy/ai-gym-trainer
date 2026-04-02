@@ -1,5 +1,6 @@
 from src.ai.angles import AngleCalculator
 
+
 class PushupFormValidator:
     def _side_visibility(self, landmarks, side):
         if side == "left":
@@ -13,14 +14,19 @@ class PushupFormValidator:
     def validate(self, landmarks):
         feedback = []
 
-        side = "left" if self._side_visibility(landmarks, "left") >= self._side_visibility(landmarks, "right") else "right"
+        side = (
+            "left"
+            if self._side_visibility(landmarks, "left")
+            >= self._side_visibility(landmarks, "right")
+            else "right"
+        )
         elbow = AngleCalculator.elbow_angle(landmarks, side)
         hip = AngleCalculator.hip_angle(landmarks, side)
 
-        if elbow > 130:
+        if elbow > 138:
             feedback.append("Go lower in your pushup")
 
-        if hip < 150:
+        if hip < 145:
             feedback.append("Keep your hips straight")
 
         if not feedback:

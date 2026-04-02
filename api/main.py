@@ -60,6 +60,7 @@ class RTCOffer(BaseModel):
     type: str
 
 LEGACY_PLAYER_FILE = Path(__file__).resolve().parent.parent / "src" / "data" / "players.json"
+PLAYER_FILE = LEGACY_PLAYER_FILE
 
 
 class SessionHistoryItem(BaseModel):
@@ -113,6 +114,39 @@ def sync_engine_player(user: User) -> None:
         engine.state["xp_required"] = engine.level_system.xp_needed(engine.player.level)
 
 
+def default_player():
+    return {"xp": 0, "level": 1, "badges": [], "history": []}
+
+
+def load_players() -> dict:
+    player_file = Path(PLAYER_FILE)
+    if not player_file.exists():
+        return {}
+
+    try:
+        with open(player_file, "r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    return raw if isinstance(raw, dict) else {}
+
+
+def save_players(players: dict) -> None:
+    player_file = Path(PLAYER_FILE)
+    player_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(player_file, "w", encoding="utf-8") as handle:
+        json.dump(players, handle, indent=2)
+
+
+def ensure_player(players: dict, name: str):
+    clean_name = str(name).strip()
+    if clean_name not in players:
+        players[clean_name] = default_player()
+        return players[clean_name], True
+    return players[clean_name], False
+
+
 @app.on_event("startup")
 def startup_database() -> None:
     Base.metadata.create_all(bind=db_engine)
@@ -160,6 +194,22 @@ def stop_workout(name: str = "You", db: Session = Depends(get_db)):
     db.refresh(user)
     sync_engine_player(user)
 
+    players = load_players()
+    player, _ = ensure_player(players, user.name)
+    player["xp"] = int(user.xp or 0)
+    player["level"] = int(user.level or 1)
+    player.setdefault("badges", [])
+    player["badges"] = sorted(set(player["badges"]) | set(engine.unlocked_badges))
+    player.setdefault("history", [])
+    player["history"].append(
+        {
+            "date": datetime.utcnow().isoformat(),
+            "reps": engine.state["reps"],
+            "exercise": engine.state["exercise"],
+        }
+    )
+    save_players(players)
+
     # Keep runtime badge cache aligned with persisted badge rows.
     engine.unlocked_badges = {badge.badge_name for badge in user.badges}
 
@@ -191,8 +241,9 @@ async def webrtc_offer(offer: RTCOffer):
             while True:
                 try:
                     frame = await track.recv()
-                    # If processing is behind, drop stale frames before expensive conversion.
-                    if engine.has_pending_external_frame():
+                    # Drop stale frames when processing falls behind.
+                    has_pending_frame = engine.has_pending_external_frame()
+                    if has_pending_frame:
                         continue
                     image = frame.to_ndarray(format="bgr24")
                     engine.ingest_external_frame(image)
@@ -227,7 +278,9 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Wait for a new frame without blocking the async event loop
-            await loop.run_in_executor(None, lambda: engine._frame_event.wait(timeout=0.1))
+            await loop.run_in_executor(
+                None, lambda: engine._frame_event.wait(timeout=0.1)
+            )
             engine._frame_event.clear()
 
             raw_frame = engine.raw_frame
@@ -236,21 +289,27 @@ async def websocket_endpoint(websocket: WebSocket):
                 frame_b64 = None
                 if SEND_WS_FRAMES:
                     blank = np.zeros((480, 640, 3), dtype=np.uint8)
-                    cv2.putText(blank, "Camera Stopped", (150, 240),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    _, buffer = cv2.imencode('.jpg', blank, encode_params)
-                    frame_b64 = base64.b64encode(buffer).decode('utf-8')
-                await websocket.send_text(json.dumps({
-                    "frame": frame_b64,
-                    "landmarks": []
-                }))
+                    cv2.putText(
+                        blank,
+                        "Camera Stopped",
+                        (150, 240),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 0, 255),
+                        2,
+                    )
+                    _, buffer = cv2.imencode(".jpg", blank, encode_params)
+                    frame_b64 = base64.b64encode(buffer).decode("utf-8")
+                await websocket.send_text(
+                    json.dumps({"frame": frame_b64, "landmarks": []})
+                )
                 await asyncio.sleep(0.1)
                 continue
 
             frame_b64 = None
             if SEND_WS_FRAMES:
-                _, buffer = cv2.imencode('.jpg', raw_frame, encode_params)
-                frame_b64 = base64.b64encode(buffer).decode('utf-8')
+                _, buffer = cv2.imencode(".jpg", raw_frame, encode_params)
+                frame_b64 = base64.b64encode(buffer).decode("utf-8")
 
             with engine._state_lock:
                 state_snapshot = engine.state.copy()
@@ -261,11 +320,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
             state_snapshot["badges"] = new_badges
 
-            payload = json.dumps({
-                "frame": frame_b64,
-                "landmarks": engine.display_landmarks,
-                **state_snapshot
-            })
+            payload = json.dumps(
+                {
+                    "frame": frame_b64,
+                    "landmarks": engine.display_landmarks,
+                    **state_snapshot,
+                }
+            )
             await websocket.send_text(payload)
 
     except WebSocketDisconnect:
@@ -284,13 +345,31 @@ def video_feed():
             "Pragma": "no-cache",
             "Expires": "0",
             "X-Accel-Buffering": "no",
-        }
+        },
     )
 
 
 @app.get("/leaderboard")
 def get_leaderboard(db: Session = Depends(get_db)):
-    return get_leaderboard_payload(db, top_n=10)
+    if Path(PLAYER_FILE) != LEGACY_PLAYER_FILE:
+        players = load_players()
+        if players:
+            return sorted(
+                [{"name": name, "xp": int(record.get("xp", 0) or 0)} for name, record in players.items()],
+                key=lambda item: item["xp"],
+                reverse=True,
+            )[:10]
+
+    leaderboard = get_leaderboard_payload(db, top_n=10)
+    if leaderboard:
+        return leaderboard
+
+    players = load_players()
+    return sorted(
+        [{"name": name, "xp": int(record.get("xp", 0) or 0)} for name, record in players.items()],
+        key=lambda item: item["xp"],
+        reverse=True,
+    )[:10]
 
 
 @app.get("/history")
@@ -299,6 +378,7 @@ def get_history(name: str, db: Session = Depends(get_db)):
         return get_user_history_payload(db, name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
 
 @app.post("/login")
 def login(name: str, db: Session = Depends(get_db)):
@@ -311,6 +391,14 @@ def login(name: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     sync_engine_player(user)
+
+    players = load_players()
+    player, _ = ensure_player(players, user.name)
+    player["xp"] = int(user.xp or 0)
+    player["level"] = int(user.level or 1)
+    player.setdefault("badges", [])
+    player.setdefault("history", [])
+    save_players(players)
 
     return {
         "name": user.name,

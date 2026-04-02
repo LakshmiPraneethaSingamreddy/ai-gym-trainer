@@ -2,11 +2,13 @@
 from enum import Enum
 from src.ai.angles import AngleCalculator
 
+
 class LungeState(Enum):
     STANDING = 1
     DESCENDING = 2
     BOTTOM = 3
     ASCENDING = 4
+
 
 class LungeStateMachine:
     def __init__(self):
@@ -24,13 +26,13 @@ class LungeStateMachine:
             # active_leg = "right"
             knee = right_knee
 
-        if self.state == LungeState.STANDING and knee < 150:
+        if self.state == LungeState.STANDING and knee < 155:
             self.state = LungeState.DESCENDING
-        elif self.state == LungeState.DESCENDING and knee < 90:
+        elif self.state == LungeState.DESCENDING and knee < 96:
             self.state = LungeState.BOTTOM
-        elif self.state == LungeState.BOTTOM and knee > 100:
+        elif self.state == LungeState.BOTTOM and knee > 104:
             self.state = LungeState.ASCENDING
-        elif self.state == LungeState.ASCENDING and knee > 160:
+        elif self.state == LungeState.ASCENDING and knee > 158:
             self.state = LungeState.STANDING
 
         return self.state

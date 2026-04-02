@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { API_BASE } from "./apiConfig";
+import { apiUrl } from "./apiConfig";
 
 function Login({ setUsername }) {
   const [name, setName] = useState("");
@@ -11,7 +11,7 @@ function Login({ setUsername }) {
       return;
     }
 
-    fetch(`${API_BASE}/login?name=${encodeURIComponent(name)}`, {
+  fetch(apiUrl(`/login?name=${encodeURIComponent(name)}`), {
       method: "POST"
     })
       .then(async (res) => {

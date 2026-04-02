@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 import Login from "./Login";
-import { API_BASE, WS_BASE } from "./apiConfig";
+import { apiUrl, wsUrl } from "./apiConfig";
 
 // MediaPipe skeleton connections (pairs of landmark indices)
 const POSE_CONNECTIONS = [
@@ -26,6 +26,13 @@ const INITIAL_STATE = {
 };
 
 function App() {
+  const formatDuration = (secondsValue) => {
+    const totalSeconds = Math.max(0, Math.floor(Number(secondsValue) || 0));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  };
+
   const [state, setState] = useState(INITIAL_STATE);
 
   const [username, setUsername] = useState(
@@ -85,7 +92,7 @@ function App() {
     if (!username) return;
 
     const fetchLeaderboard = () => {
-      fetch(`${API_BASE}/leaderboard`)
+      fetch(apiUrl("/leaderboard"))
         .then(res => res.json())
         .then(data => setLeaderboard(data))
         .catch(err => console.error("Leaderboard error:", err));
@@ -101,7 +108,7 @@ function App() {
   useEffect(() => {
     if (!username) return;
 
-    fetch(`${API_BASE}/history?name=${username}`)
+    fetch(apiUrl(`/history?name=${username}`))
       .then(res => res.json())
       .then(data => setHistory(data))
       .catch(err => console.error("History error:", err));
@@ -228,7 +235,7 @@ function App() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    const response = await fetch(`${API_BASE}/webrtc/offer`, {
+    const response = await fetch(apiUrl("/webrtc/offer"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -257,7 +264,7 @@ function App() {
   useEffect(() => {
     if (!username) return;
 
-    const ws = new WebSocket(`${WS_BASE}/ws`);
+    const ws = new WebSocket(wsUrl("/ws"));
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -360,21 +367,18 @@ function App() {
   const xpPercent = state.xp_required
     ? (state.xp / state.xp_required) * 100
     : 0;
+  const isPlankActive = (state.exercise || selectedExercise) === "Plank";
 
-  const exercises = ["Squat", "Pushup", "Lunge", "Plank", "JumpingJack"];
+  const exercises = ["Squat", "Pushup", "Lunge", "Plank"];
 
   const startWorkout = async () => {
     const myStartSequence = ++startSequenceRef.current;
 
     try {
-      const params = new URLSearchParams({
-        exercise: selectedExercise,
-        name: username,
-        use_backend_camera: "false",
-      });
-      const res = await fetch(`${API_BASE}/start?${params.toString()}`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        apiUrl(`/start?exercise=${selectedExercise}&name=${username}`),
+        { method: "POST" }
+      );
       if (!res.ok) {
         throw new Error("Failed to start workout");
       }
@@ -395,7 +399,7 @@ function App() {
 
       // If backend session started before camera setup failed, stop it so UI and server stay in sync.
       try {
-        await fetch(`${API_BASE}/stop?name=${username}`, {
+        await fetch(apiUrl(`/stop?name=${username}`), {
           method: "POST",
         });
       } catch (stopError) {
@@ -410,14 +414,14 @@ function App() {
     setIsWorkoutActive(false);
 
     try {
-      const res = await fetch(`${API_BASE}/stop?name=${username}`, {
+      const res = await fetch(apiUrl(`/stop?name=${username}`), {
         method: "POST"
       });
       if (!res.ok) {
         throw new Error("Failed to stop workout");
       }
 
-      const historyRes = await fetch(`${API_BASE}/history?name=${username}`);
+      const historyRes = await fetch(apiUrl(`/history?name=${username}`));
       const data = await historyRes.json();
       setHistory(data);
     } catch (error) {
@@ -430,7 +434,7 @@ function App() {
   const handleLogout = async () => {
     if (isWorkoutActive) {
       try {
-        await fetch(`${API_BASE}/stop?name=${username}`, { method: "POST" });
+        await fetch(apiUrl(`/stop?name=${username}`), { method: "POST" });
       } catch (error) {
         console.error("Logout stop error:", error);
       }
@@ -555,8 +559,8 @@ function App() {
           </div>
 
           <div className="card reps-card">
-            <h3>Reps</h3>
-            <p className="big-text">{state.reps}</p>
+            <h3>{isPlankActive ? "Plank Timer" : "Reps"}</h3>
+            <p className="big-text">{isPlankActive ? formatDuration(state.reps) : state.reps}</p>
           </div>
 
           <div className="card">
@@ -576,7 +580,7 @@ function App() {
           </div>
 
           <div className="card leaderboard">
-            <h3>Leaderboard</h3>
+            <h3>Level-wise Leaderboard</h3>
             {leaderboard.map((user, i) => (
               <div key={i} className="leaderboard-item">
                 <span>{i + 1}. {user.name}</span>

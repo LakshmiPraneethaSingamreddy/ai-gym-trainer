@@ -6,12 +6,12 @@ class XPSystem:
         """
         if score is None:
             return 0
-        
+
         if isinstance(score, dict):
-            final_score = score.get('final_score', 0)
+            final_score = score.get("final_score", 0)
         else:
             final_score = score
-        
+
         # Award XP based on rep quality: higher score = more XP
         # Range: 0-10 XP per rep (for scores 0-100)
         rep_xp = int(final_score * 0.05)
@@ -22,13 +22,13 @@ class XPSystem:
         XP rules:
         - reps reward effort (majority)
         - score rewards quality (bonus)
-        
+
         Max ~30 XP per workout to ensure reasonable progression.
         """
 
         avg_score = summary.get("avg_score", 0)
         total_reps = summary.get("total_reps", 1)
-        
+
         # Balanced formula: effort-focused with quality bonus
         # 1 rep with score 0 = 3 XP
         # 3 reps with score 50 = ~12 XP

@@ -1,5 +1,6 @@
 from src.ai.angles import AngleCalculator
 
+
 class PerformanceScorer:
     """
     Computes a performance score for each rep based on:
@@ -17,17 +18,16 @@ class PerformanceScorer:
         Called every frame.
         Collects frame data during a rep and scores it when rep completes.
         """
-        state_name = (squat_state.name if hasattr(squat_state, "name") else squat_state)
+        state_name = squat_state.name if hasattr(squat_state, "name") else squat_state
 
         knee_angle = AngleCalculator.knee_angle(landmarks, side="left")
         hip_angle = AngleCalculator.hip_angle(landmarks, side="left")
 
         # Collect frame data during movement
         if state_name in ["DESCENDING", "BOTTOM", "ASCENDING"]:
-            self.current_rep_frames.append({
-                "knee_angle": knee_angle,
-                "hip_angle": hip_angle
-            })
+            self.current_rep_frames.append(
+                {"knee_angle": knee_angle, "hip_angle": hip_angle}
+            )
 
         # When rep finishes → score it
         if state_name == "STANDING" and len(self.current_rep_frames) > 0:
@@ -47,7 +47,7 @@ class PerformanceScorer:
         knee_angles = [f["knee_angle"] for f in frames]
         hip_angles = [f["hip_angle"] for f in frames]
 
-        min_knee = min(knee_angles)   # deepest squat
+        min_knee = min(knee_angles)  # deepest squat
         avg_hip = sum(hip_angles) / len(hip_angles)
 
         # --- Scoring Logic ---
@@ -59,10 +59,12 @@ class PerformanceScorer:
         return {
             "depth_score": depth_score,
             "hip_score": hip_score,
-            "final_score": final_score
+            "final_score": final_score,
         }
 
     def get_average_score(self):
         if not self.rep_scores:
             return 0
-        return int(sum(r["final_score"] for r in self.rep_scores) / len(self.rep_scores))
+        return int(
+            sum(r["final_score"] for r in self.rep_scores) / len(self.rep_scores)
+        )

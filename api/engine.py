@@ -33,9 +33,11 @@ class WorkoutEngine:
         self._external_frame_lock = threading.Lock()
 
         self.current_frame = None
-        self.raw_frame = None           # Latest camera frame, no processing applied
-        self.display_landmarks = []     # Screen-space landmarks (0-1) for canvas overlay
-        self._frame_event = threading.Event()  # Signals WebSocket when a new frame is ready
+        self.raw_frame = None  # Latest camera frame, no processing applied
+        self.display_landmarks = []  # Screen-space landmarks (0-1) for canvas overlay
+        self._frame_event = (
+            threading.Event()
+        )  # Signals WebSocket when a new frame is ready
         self._external_frame = None
         self.cam = None
         self.detector = None
@@ -49,7 +51,7 @@ class WorkoutEngine:
             "level": 1,
             "feedback": "",
             "exercise": "None",
-            "badges": []
+            "badges": [],
         }
 
         # Systems
@@ -119,31 +121,33 @@ class WorkoutEngine:
             feedback = None
             if exercise.allow_feedback(state_name):
                 feedback = self.feedback_controller.update(
-                    exercise,
-                    state_name,
-                    exercise.validate_form(landmarks)
+                    exercise, state_name, exercise.validate_form(landmarks)
                 )
 
             self.session.update(reps=reps, score=score, feedback=feedback)
 
             # XP only on newly completed reps.
-            if reps > self.last_rep_count:
-                final_score = score.get("final_score", 0) if isinstance(score, dict) else 0
-                xp_gain = self.xp_system.calculate_xp({
-                    "avg_score": final_score,
-                    "total_reps": reps
-                })
+            # Plank reports hold time, so award XP only on slower 5-second milestones
+            # to keep progression comparable to rep-based exercises.
+            progress_value = int(reps // 5) if exercise.name == "Plank" else reps
+            if progress_value > self.last_rep_count:
+                final_score = (
+                    score.get("final_score", 0) if isinstance(score, dict) else 0
+                )
+                xp_gain = self.xp_system.calculate_xp(
+                    {"avg_score": final_score, "total_reps": progress_value}
+                )
 
                 self.player.add_xp(xp_gain)
                 self.level_system.check_level_up(self.player)
 
-                self.last_rep_count = reps
+                self.last_rep_count = progress_value
 
             best_score = score.get("final_score", 0) if isinstance(score, dict) else 0
 
             new_badges = self.badge_system.evaluate({
                 "reps": reps,
-                "best_score": best_score
+                "best_score": best_score,
             })
 
             if new_badges:
@@ -154,22 +158,32 @@ class WorkoutEngine:
                             self.recent_badges.append(badge.name)
 
             with self._state_lock:
-                self.state.update({
-                    "reps": reps,
-                    "xp": self.player.xp,
-                    "level": self.player.level,
-                    "xp_required": self.level_system.xp_needed(self.player.level),
-                    "feedback": feedback[-1] if isinstance(feedback, list) else (feedback or ""),
-                    "exercise": exercise.name,
-                    "badges": list(self.recent_badges)
-                })
+                self.state.update(
+                    {
+                        "reps": reps,
+                        "xp": self.player.xp,
+                        "level": self.player.level,
+                        "xp_required": self.level_system.xp_needed(self.player.level),
+                        "feedback": (
+                            feedback[-1]
+                            if isinstance(feedback, list)
+                            else (feedback or "")
+                        ),
+                        "exercise": exercise.name,
+                        "badges": list(self.recent_badges),
+                    }
+                )
         else:
             with self._state_lock:
                 if self.exercise:
                     self.state["exercise"] = self.exercise.name
 
     def _reset_exercise_counter(self):
-        if self.exercise and hasattr(self.exercise, "rep_counter") and hasattr(self.exercise.rep_counter, "reset"):
+        if (
+            self.exercise
+            and hasattr(self.exercise, "rep_counter")
+            and hasattr(self.exercise.rep_counter, "reset")
+        ):
             self.exercise.rep_counter.reset()
 
     def _reset_session_state(self):
@@ -216,7 +230,9 @@ class WorkoutEngine:
                 self._external_thread = None
             else:
                 self.thread = None
-                self._external_thread = threading.Thread(target=self.run_external_loop, daemon=True)
+                self._external_thread = threading.Thread(
+                    target=self.run_external_loop, daemon=True
+                )
                 self._external_thread.start()
 
     def ingest_external_frame(self, frame):
@@ -272,10 +288,10 @@ class WorkoutEngine:
         with self._external_frame_lock:
             self._external_frame = None
 
-        self.current_frame = None   # prevents freeze frame
+        self.current_frame = None  # prevents freeze frame
         self.raw_frame = None
         self.display_landmarks = []
-        self._frame_event.set()     # unblock any waiting WebSocket handler
+        self._frame_event.set()  # unblock any waiting WebSocket handler
 
     def run_loop(self):
         while self.running:
@@ -331,17 +347,17 @@ class WorkoutEngine:
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
                     (0, 0, 255),
-                    2
+                    2,
                 )
             elif self.current_frame is not None:
                 frame = self.current_frame.copy()
             else:
                 continue
 
-            _, buffer = cv2.imencode('.jpg', frame, encode_params)
+            _, buffer = cv2.imencode(".jpg", frame, encode_params)
             frame_bytes = buffer.tobytes()
 
             yield (
-                b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n'
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" + frame_bytes + b"\r\n"
             )
