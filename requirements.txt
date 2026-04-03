@@ -1,8 +1,6 @@
 opencv-python
 mediapipe
 numpy
-pandas
-streamlit
 fastapi
 httpx
 uvicorn
@@ -11,6 +9,5 @@ aiortc
 sqlalchemy
 psycopg2-binary
 pytest
-httpx
 black
 flake8
