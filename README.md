@@ -1,61 +1,97 @@
 # AI Gym Trainer
 
-AI Gym Trainer is a **full-stack**, **real-time** fitness coaching application that delivers **live posture feedback**, **rep counting**, and **gamified progress tracking** using computer vision.
+AI Gym Trainer is a **full-stack AI fitness trainer** that delivers **real-time fitness coaching** with **live posture feedback**, **rep counting**, and **gamified progress tracking** using **computer vision**.
 
-The app captures the user webcam stream in the browser, analyzes pose and movement in the backend, and continuously returns workout insights including **rep count**, **exercise state**, **form feedback**, **XP progression**, and **leaderboard updates**.
+It turns a standard browser camera into an interactive workout assistant: the frontend streams video to the backend, and the app returns live state updates such as reps, feedback, **XP system** progress, levels, and badges.
 
 ## Demo
 
-Add your links here:
-1. Live demo URL
-2. Demo video URL
-3. Screenshots or GIFs
+Project links:
 
-## Product Story
+- Live Demo: `https://...`
+- Demo Video: `https://...`
+- Screenshots/GIFs: 
 
-AI Gym Trainer was built to make solo workouts feel guided and measurable. Instead of following static content, users interact with a **live coaching interface** that reacts to their movement in real time. The experience is designed around a continuous loop of **action**, **feedback**, and **progression** so users can improve technique while staying motivated through **levels**, **badges**, and **ranking**.
+## Features
 
-## How It Works
+- **Real-time workout tracking** directly from browser webcam input
+- **Exercise form analysis** with exercise-specific movement-state detection
+- **Rep counting** powered by state transitions instead of timer-based heuristics
+- Live landmarks and **real-time posture correction** feedback cues
+- **Gamification** with **XP system**, levels, badges, and a competitive **leaderboard**
+- Persistent user history and profile progression across sessions
 
-1. The browser captures video with user permission.
-2. Video streaming is handled through **WebRTC** to the backend for low-latency ingestion.
-3. The backend runs **pose estimation** and exercise state logic.
-4. Workout state updates are returned over **WebSocket** for real-time UI updates.
-5. The frontend renders **feedback**, **rep count**, **XP**, **level**, and **leaderboard** data.
-
-## Key Functionalities
-
-1. **Real-time** workout tracking through browser webcam input.
-2. Exercise workflows for **Squat**, **Pushup**, **Lunge**, and **Plank**.
-3. **Rep counting** using state-based exercise logic.
-4. **Form feedback** and landmark visualization for posture correction.
-5. **XP progression**, **level advancement**, **badge unlocks**, and **leaderboard ranking**.
-6. Workout history and profile continuity across sessions.
-
-## Technology Stack
+## Tech Stack
 
 ### Frontend
-**React (Create React App)**, **JavaScript**, **WebRTC**, **WebSocket**
+- **React** (Create React App)
+- JavaScript
+- **WebRTC** and **WebSocket**
 
 ### Backend
-
-**FastAPI**, **Uvicorn**, **aiortc**
+- **FastAPI**
+- Uvicorn
+- aiortc
 
 ### Computer Vision
+- **OpenCV**
+- **MediaPipe**
+- NumPy
 
-**OpenCV**, **MediaPipe**, **NumPy**
+### Storage
+- SQLite (via SQLAlchemy)
+- Legacy JSON files for compatibility/migration
 
-### Data Layer
+### Tooling
+- pytest
+- black
+- flake8
 
-**JSON persistence** for player and history state
+## Architecture Overview
 
-### Quality and Tooling
+1. Browser captures video.
+2. Video is streamed to the backend via WebRTC.
+3. Backend runs **pose estimation** and exercise logic.
+4. Backend sends live state updates through WebSocket.
+5. Frontend updates workout UI in near real-time.
 
-**pytest**, **black**, **flake8**
+This separates capture, processing, and rendering, which keeps the system modular and easier to optimize.
+
+## API Overview
+
+### Session and streaming
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/` | GET | Health check |
+| `/start` | POST | Start workout session |
+| `/stop` | POST | Stop workout and persist session progress |
+| `/state` | GET | Get current workout state |
+| `/webrtc/offer` | POST | WebRTC SDP offer/answer negotiation |
+| `/ws` | WS | Real-time state stream (and optional frames) |
+| `/video_feed` | GET | MJPEG stream for backend camera mode |
+
+### User and leaderboard
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/leaderboard` | GET | Top users by XP |
+| `/history?name=<user>` | GET | Workout history for a user |
+| `/signup` `/signin` `/login` | POST | Create or fetch user |
+| `/signout` `/logout` | POST | Sign out user (persists active session if running) |
+| `/users` | GET | List users |
+| `/users/{name}` | GET | Get user details |
+| `/users/{name}` | POST | Create user with optional payload |
+| `/users/{name}` | PUT | Upsert user fields |
+| `/users/{name}` | DELETE | Delete user |
 
 ## Project Structure
 
-**api** contains FastAPI application and engine entrypoints. **src** contains core CV, exercise logic, session logic, and gamification modules. **ai-gym-frontend** contains the React client.
+- `api/`: FastAPI app, database integration, workout API
+- `src/`: Core exercise logic, CV helpers, gamification systems
+- `ai-gym-frontend/`: React client app
+- `tests/`: Backend and integration tests
+- `data/`: Recorded landmark CSV files for analysis/training data
 
 ## Local Development
 
@@ -76,54 +112,39 @@ npm install
 npm start
 ```
 
-Default URLs:
-1. Frontend: http://localhost:3000
-2. Backend: http://localhost:8000
+Default local URLs:
+
+- Frontend: http://localhost:3000
+- Backend: http://127.0.0.1:8000
 
 ## Environment Variables
 
 ### Frontend
 
-**REACT_APP_API_BASE_URL** defines the backend base URL. Default local value is **http://127.0.0.1:8000**.
+- `REACT_APP_API_BASE_URL`: Backend base URL (default: `http://127.0.0.1:8000`)
 
 ### Backend
 
-**USE_BACKEND_CAMERA** controls server-side webcam usage (0 off, 1 on). **SEND_WS_FRAMES** controls whether image frames are included in websocket payloads.
+- `USE_BACKEND_CAMERA`: Use server-side camera capture (`0` or `1`, default `0`)
+- `SEND_WS_FRAMES`: Include JPEG frames in WebSocket payload (`0` or `1`, default `1`)
 
-Recommended for production:
-1. USE_BACKEND_CAMERA=0
-2. SEND_WS_FRAMES=0
+Recommended production values:
 
-## Deployment Notes
-
-The frontend uses the **end user browser camera**, not the server camera. Set **REACT_APP_API_BASE_URL** before frontend build. Persist **src/data/players.json** with a mounted volume or migrate to a managed database for reliable storage.
+- `USE_BACKEND_CAMERA=0`
+- `SEND_WS_FRAMES=0`
 
 ## Docker (Backend)
 
-```powershell
+```bash
 docker build -t ai-gym-backend .
-docker run --rm -p 8000:8000 -e USE_BACKEND_CAMERA=0 ai-gym-backend
+docker run --rm -p 8000:8000 -e USE_BACKEND_CAMERA=0 -e SEND_WS_FRAMES=0 ai-gym-backend
 ```
 
-## Known Limitations
+## Future Enhancements
 
-1. Persistence currently relies on **JSON files** and is not ideal for multi-instance production.
-2. **Authentication** and **authorization** are not yet implemented.
-3. **CORS** is still broad and should be restricted by environment before public deployment.
+- Advanced form scoring with richer movement quality metrics
+- Personalized coaching plans and adaptive difficulty progression
+- Expanded exercise library with guided multi-exercise workout flows
+- Social features such as challenges, streaks, and friend leaderboards
+- Stronger production readiness with CI/CD and enhanced observability
 
-## Roadmap
-
-### Near-Term Priorities
-
-1. Move persistence from JSON to SQLite or PostgreSQL.
-2. Add environment-based CORS restrictions.
-3. Add health and readiness endpoints.
-4. Expand API and integration test coverage.
-5. Add CI pipeline for lint, test, and build checks.
-
-### Future Vision
-
-1. Multi-exercise session plans.
-2. Improved form scoring models.
-3. Personalized coaching and adaptive plans.
-4. Social features such as challenges and friend leaderboards.
