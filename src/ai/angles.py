@@ -2,8 +2,17 @@ import math
 
 
 class AngleCalculator:
+    """Calculate body angles from landmarks for exercise form validation."""
     @staticmethod
     def calculate_angle(a, b, c):
+        """Calculate angle ABC between three points in degrees.
+        
+        Args:
+            a, b, c: Landmarks with x, y coordinates.
+        
+        Returns:
+            float: Angle in degrees (0-180).
+        """
         """
         Calculates angle ABC (in degrees)
         a, b, c are landmarks with x,y
@@ -22,6 +31,15 @@ class AngleCalculator:
 
     @staticmethod
     def back_angle(landmarks, side="left"):
+        """Calculate torso lean angle relative to vertical.
+        
+        Args:
+            landmarks: Pose landmarks.
+            side: "left" or "right" side.
+        
+        Returns:
+            float: Angle in degrees (0 = upright, higher = forward lean).
+        """
         """
         Calculates torso lean angle relative to vertical.
         0° = perfectly upright
@@ -42,6 +60,15 @@ class AngleCalculator:
 
     @staticmethod
     def knee_angle(landmarks, side="left"):
+        """Calculate knee joint angle.
+        
+        Args:
+            landmarks: Pose landmarks.
+            side: "left" or "right" leg.
+        
+        Returns:
+            float: Knee angle in degrees (0-180).
+        """
         if side == "left":
             hip = landmarks[23]  # LEFT_HIP
             knee = landmarks[25]  # LEFT_KNEE
@@ -55,6 +82,15 @@ class AngleCalculator:
 
     @staticmethod
     def hip_angle(landmarks, side="left"):
+        """Calculate hip joint angle.
+        
+        Args:
+            landmarks: Pose landmarks.
+            side: "left" or "right" leg.
+        
+        Returns:
+            float: Hip angle in degrees.
+        """
         if side == "left":
             shoulder = landmarks[11]  # LEFT_SHOULDER
             hip = landmarks[23]  # LEFT_HIP
@@ -68,6 +104,15 @@ class AngleCalculator:
 
     @staticmethod
     def elbow_angle(landmarks, side="left"):
+        """Calculate elbow joint angle.
+        
+        Args:
+            landmarks: Pose landmarks.
+            side: "left" or "right" arm.
+        
+        Returns:
+            float: Elbow angle in degrees (0-180).
+        """
         if side == "left":
             shoulder = landmarks[11]  # LEFT_SHOULDER
             elbow = landmarks[13]  # LEFT_ELBOW

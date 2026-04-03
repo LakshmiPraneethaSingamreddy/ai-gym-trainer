@@ -2,10 +2,16 @@ from src.gamification.badge_registry import BadgeRegistry
 
 
 class BadgeSystem:
+    """Manages badge (achievement) unlocking and tracking."""
 
     DISPLAY_DURATION = 3.0  # seconds
 
     def __init__(self, player_profile):
+        """Initialize badge system with available badges from registry.
+        
+        Args:
+            player_profile: Player instance to track badges for.
+        """
         self.player = player_profile
         self.badges = BadgeRegistry.get_all_badges()
 
@@ -16,6 +22,14 @@ class BadgeSystem:
     # Evaluate badges after workout
     # ----------------------------------
     def evaluate(self, summary):
+        """Evaluate if any new badges are earned based on workout summary.
+        
+        Args:
+            summary: Workout summary with stats.
+        
+        Returns:
+            list: Newly unlocked Badge objects.
+        """
         unlocked = []
         owned = set(self.player.badges)
 
@@ -33,6 +47,15 @@ class BadgeSystem:
     # Conditions
     # ----------------------------------
     def _check_condition(self, badge_id, summary):
+        """Check if badge unlock condition is met.
+        
+        Args:
+            badge_id: Badge identifier.
+            summary: Workout summary.
+        
+        Returns:
+            bool: Whether condition is satisfied.
+        """
         if badge_id == "first_workout":
             return self.player.total_workouts >= 1
 

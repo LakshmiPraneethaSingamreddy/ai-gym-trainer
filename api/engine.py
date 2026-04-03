@@ -131,6 +131,7 @@ class WorkoutEngine:
             # to keep progression comparable to rep-based exercises.
             progress_value = int(reps // 5) if exercise.name == "Low Plank" else reps
             if progress_value > self.last_rep_count:
+                # Only award XP for newly completed progress milestones.
                 final_score = (
                     score.get("final_score", 0) if isinstance(score, dict) else 0
                 )
@@ -153,6 +154,7 @@ class WorkoutEngine:
             if new_badges:
                 with self._state_lock:
                     for badge in new_badges:
+                        # De-duplicate announcements across consecutive frames.
                         if badge.name not in self.unlocked_badges:
                             self.unlocked_badges.add(badge.name)
                             self.recent_badges.append(badge.name)

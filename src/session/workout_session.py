@@ -3,12 +3,14 @@ from collections import Counter
 
 
 class WorkoutSession:
+    """Tracks full workout statistics independent from exercise."""
     """
     Tracks full workout statistics.
     Independent from exercises.
     """
 
     def __init__(self):
+        """Initialize new workout session tracker."""
         self.start_time = time.time()
 
         self.total_reps = 0
@@ -21,6 +23,13 @@ class WorkoutSession:
     # Update per frame
     # --------------------------------------------------
     def update(self, reps, score, feedback):
+        """Update session with rep and feedback data.
+        
+        Args:
+            reps: Current rep count.
+            score: Quality score for current rep.
+            feedback: Form feedback message or None.
+        """
         """
         Called every frame from pipeline.
         """
@@ -44,6 +53,14 @@ class WorkoutSession:
     # Build summary
     # --------------------------------------------------
     def get_summary(self, exercise_name):
+        """Generate workout summary with statistics.
+        
+        Args:
+            exercise_name: Name of exercise performed.
+        
+        Returns:
+            dict: Summary with reps, duration, average score, feedback log.
+        """
 
         duration = int(time.time() - self.start_time)
         minutes = duration // 60

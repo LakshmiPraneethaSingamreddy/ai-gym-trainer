@@ -1,10 +1,12 @@
 class FeedbackController:
+    """Controls timing and display of form feedback to prevent noise."""
     """
     Controls WHEN feedback should be shown.
     Prevents noisy real-time feedback.
     """
 
     def __init__(self):
+        """Initialize feedback controller with display duration of ~3 seconds."""
         self.pending_feedback = None
         self.frames_since_feedback = 0
         self.MAX_WAIT_FRAMES = 45  # ~1.5 sec @30fps
@@ -15,6 +17,16 @@ class FeedbackController:
         self.DISPLAY_FRAMES = 90  # show feedback ~3 seconds
 
     def update(self, exercise, state_name, raw_feedback):
+        """Process and display feedback based on state and exercise.
+        
+        Args:
+            exercise: Current exercise object.
+            state_name: Current exercise state.
+            raw_feedback: Raw feedback from validator.
+        
+        Returns:
+            Feedback message or None if not in valid state.
+        """
         """
         exercise -> current exercise object
         state_name -> current state

@@ -13,6 +13,17 @@ ALLOWED_NAME_RE = re.compile(r"^[A-Za-z0-9 _.-]+$")
 
 
 def normalize_name(name: str) -> str:
+    """Normalize and validate username.
+    
+    Args:
+        name: Raw username input.
+    
+    Returns:
+        str: Cleaned username.
+    
+    Raises:
+        ValueError: If name is empty, too long, or contains invalid characters.
+    """
     cleaned = str(name or "").strip()
     if not cleaned:
         raise ValueError("User name cannot be empty")
@@ -24,6 +35,15 @@ def normalize_name(name: str) -> str:
 
 
 def create_user_if_missing(db: Session, name: str) -> User:
+    """Create user if not exists, else return existing.
+    
+    Args:
+        db: Database session.
+        name: Username.
+    
+    Returns:
+        User: User instance (new or existing).
+    """
     cleaned_name = normalize_name(name)
     user = db.query(User).filter(User.name == cleaned_name).first()
     if user:
@@ -36,11 +56,29 @@ def create_user_if_missing(db: Session, name: str) -> User:
 
 
 def get_user_by_name(db: Session, name: str) -> User | None:
+    """Fetch user from database by name.
+    
+    Args:
+        db: Database session.
+        name: Username.
+    
+    Returns:
+        User or None if not found.
+    """
     cleaned_name = normalize_name(name)
     return db.query(User).filter(User.name == cleaned_name).first()
 
 
 def user_to_dict(user: User, include_history: bool = True) -> dict:
+    """Convert User object to dictionary payload.
+    
+    Args:
+        user: User instance.
+        include_history: Whether to include workout history.
+    
+    Returns:
+        dict: User data with XP, level, badges, and optionally history.
+    """
     payload = {
         "xp": int(user.xp or 0),
         "level": int(user.level or 1),
@@ -67,6 +105,17 @@ def list_users_payload(db: Session) -> dict:
 
 
 def update_user(db: Session, user: User, xp: int | None = None, level: int | None = None) -> User:
+    """Update user XP and level.
+    
+    Args:
+        db: Database session.
+        user: User to update.
+        xp: New XP value (must be >= 0).
+        level: New level (must be >= 1).
+    
+    Returns:
+        User: Updated user instance.
+    """
     if xp is not None:
         user.xp = max(0, int(xp))
     if level is not None:
@@ -92,6 +141,13 @@ def set_user_badges(db: Session, user: User, badges: list[str]) -> None:
 
 
 def add_badges(db: Session, user: User, new_badges: list[str]) -> None:
+    """Add new badges to user, skipping duplicates.
+    
+    Args:
+        db: Database session.
+        user: User instance.
+        new_badges: List of badge names to add.
+    """
     existing = {badge.badge_name for badge in user.badges}
     for badge_name in set(new_badges):
         clean = str(badge_name).strip()
@@ -102,6 +158,15 @@ def add_badges(db: Session, user: User, new_badges: list[str]) -> None:
 
 
 def add_history_item(db: Session, user: User, reps: int, exercise: str, when: datetime | None = None) -> None:
+    """Record workout entry in user history.
+    
+    Args:
+        db: Database session.
+        user: User instance.
+        reps: Reps completed.
+        exercise: Exercise name.
+        when: Timestamp (defaults to now).
+    """
     clean_exercise = str(exercise or "").strip()
     if not clean_exercise:
         raise ValueError("Exercise cannot be empty")
@@ -144,11 +209,29 @@ def get_user_history_payload(db: Session, name: str) -> list[dict]:
 
 
 def get_leaderboard_payload(db: Session, top_n: int = 10) -> list[dict]:
+    """Get top N users ranked by XP.
+    
+    Args:
+        db: Database session.
+        top_n: Number of top users to return.
+    
+    Returns:
+        list: User objects sorted by XP descending.
+    """
     rows = db.query(User).order_by(desc(User.xp), User.name.asc()).limit(top_n).all()
     return [{"name": row.name, "xp": int(row.xp or 0)} for row in rows]
 
 
 def import_legacy_json_if_empty(db: Session, json_path: Path) -> int:
+    """One-time migration: import legacy JSON data to database if db is empty.
+    
+    Args:
+        db: Database session.
+        json_path: Path to legacy players.json file.
+    
+    Returns:
+        int: Number of users imported (0 if none).
+    """
     user_count = db.query(User).count()
     if user_count > 0 or not json_path.exists():
         return 0

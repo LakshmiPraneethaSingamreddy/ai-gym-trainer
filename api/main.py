@@ -47,6 +47,15 @@ engine = WorkoutEngine()
 
 
 def env_flag(name: str, default: str = "1") -> bool:
+    """Parse environment variable as boolean flag.
+    
+    Args:
+        name: Environment variable name.
+        default: Default value if not set.
+    
+    Returns:
+        bool: True if value is '1', 'true', 'yes', or 'on'.
+    """
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -149,6 +158,7 @@ def ensure_player(players: dict, name: str):
 
 @app.on_event("startup")
 def startup_database() -> None:
+    """Initialize database on startup. Create tables and import legacy JSON data if db is empty."""
     Base.metadata.create_all(bind=db_engine)
     with SessionLocal() as db:
         imported = import_legacy_json_if_empty(db, LEGACY_PLAYER_FILE)
@@ -158,11 +168,22 @@ def startup_database() -> None:
 
 @app.get("/")
 def root():
+    """Health check endpoint."""
     return {"message": "AI Gym Trainer API running"}
 
 
 @app.post("/start")
 def start_workout(exercise: str = "Squat", name: str = "You", use_backend_camera: Optional[bool] = None):
+    """Start a workout session with specified exercise.
+    
+    Args:
+        exercise: Exercise type (Squat, Knee/Regular Pushups, Lunge, Low Plank, JumpingJack).
+        name: User identifier for tracking.
+        use_backend_camera: Override USE_BACKEND_CAMERA setting.
+    
+    Returns:
+        dict: Status and selected exercise name.
+    """
     selected_exercise = engine.set_exercise(exercise)
     camera_mode = USE_BACKEND_CAMERA if use_backend_camera is None else use_backend_camera
     engine.start(use_camera=camera_mode, render_frames=SEND_WS_FRAMES)
@@ -171,6 +192,15 @@ def start_workout(exercise: str = "Squat", name: str = "You", use_backend_camera
 
 @app.post("/stop")
 def stop_workout(name: str = "You", db: Session = Depends(get_db)):
+    """End workout and save session data to database.
+    
+    Args:
+        name: User identifier.
+        db: Database session.
+    
+    Returns:
+        dict: Status confirmation.
+    """
     engine.stop()
 
     try:
@@ -218,6 +248,7 @@ def stop_workout(name: str = "You", db: Session = Depends(get_db)):
 
 @app.get("/state")
 def get_state():
+    """Get current engine state including reps, XP, level, feedback, and badges."""
     return engine.get_state()
 
 
@@ -240,14 +271,17 @@ async def webrtc_offer(offer: RTCOffer):
         async def consume_video():
             while True:
                 try:
+                    # Receive decoded frames from browser WebRTC stream.
                     frame = await track.recv()
                     # Drop stale frames when processing falls behind.
                     has_pending_frame = engine.has_pending_external_frame()
                     if has_pending_frame:
                         continue
+                    # Convert AV frame into OpenCV-compatible ndarray.
                     image = frame.to_ndarray(format="bgr24")
                     engine.ingest_external_frame(image)
                 except Exception:
+                    # Exit loop when track is closed or peer disconnects.
                     break
 
         asyncio.create_task(consume_video())
@@ -271,6 +305,10 @@ async def on_shutdown():
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    """Maintain real-time WebSocket connection for live workout state updates.
+    
+    Streams: frame data, landmarks, reps, XP, level, and badge notifications.
+    """
     await websocket.accept()
     encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), 50]
     loop = asyncio.get_running_loop()
@@ -318,6 +356,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 engine.recent_badges = []
                 engine.state["badges"] = []
 
+            # Send a stable snapshot so frontend renders a consistent frame+state pair.
             state_snapshot["badges"] = new_badges
 
             payload = json.dumps(
@@ -337,6 +376,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/video_feed")
 def video_feed():
+    """Stream video frames as MJPEG for webcam monitoring."""
     return StreamingResponse(
         engine.generate_frames(),
         media_type="multipart/x-mixed-replace; boundary=frame",
@@ -351,6 +391,7 @@ def video_feed():
 
 @app.get("/leaderboard")
 def get_leaderboard(db: Session = Depends(get_db)):
+    """Get top 10 users ranked by XP."""
     if Path(PLAYER_FILE) != LEGACY_PLAYER_FILE:
         players = load_players()
         if players:
@@ -374,6 +415,14 @@ def get_leaderboard(db: Session = Depends(get_db)):
 
 @app.get("/history")
 def get_history(name: str, db: Session = Depends(get_db)):
+    """Get workout history for user.
+    
+    Args:
+        name: Username.
+    
+    Returns:
+        list: Workout entries with date, reps, and exercise type.
+    """
     try:
         return get_user_history_payload(db, name)
     except ValueError as exc:
@@ -384,6 +433,7 @@ def get_history(name: str, db: Session = Depends(get_db)):
 @app.post("/signin")
 @app.post("/login")
 def signup_signin(name: str, db: Session = Depends(get_db)):
+    """Create user or retrieve existing user."""
     try:
         clean_name = normalize_name(name)
     except ValueError as exc:
@@ -426,6 +476,7 @@ def signout(name: str = "You", db: Session = Depends(get_db)):
 
 @app.get("/users")
 def list_users(db: Session = Depends(get_db)):
+    """Get all users with their stats."""
     return list_users_payload(db)
 
 

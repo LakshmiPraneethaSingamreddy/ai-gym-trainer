@@ -7,6 +7,7 @@ from src.cv.coordinate_normalizer import CoordinateNormalizer
 
 
 class PoseDetector:
+    """Detect pose from RGB images using MediaPipe with filtering and smoothing."""
     def __init__(
         self,
         static_image_mode=False,
@@ -34,6 +35,14 @@ class PoseDetector:
         self.coordinate_normalizer = CoordinateNormalizer()
 
     def process(self, frame):
+        """Process frame and detect pose landmarks.
+        
+        Args:
+            frame: BGR image frame.
+        
+        Returns:
+            MediaPipe pose detection results.
+        """
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         self.results = self.pose.process(rgb)
         return self.results
@@ -46,6 +55,14 @@ class PoseDetector:
         return frame
 
     def extract_landmarks(self, frame):
+        """Extract normalized landmarks from frame.
+        
+        Args:
+            frame: BGR image frame.
+        
+        Returns:
+            list: Normalized 3D landmark coordinates.
+        """
         landmarks = []
 
         if not self.results or not self.results.pose_landmarks:
