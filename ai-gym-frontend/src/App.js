@@ -43,6 +43,7 @@ function App() {
   const [badgeQueue, setBadgeQueue] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [history, setHistory] = useState([]); // ✅ NEW
+  const [cameraError, setCameraError] = useState("");
   const [selectedExercise, setSelectedExercise] = useState("Squat");
   const [landmarks, setLandmarks] = useState([]);
   const [isWebRTCActive, setIsWebRTCActive] = useState(false);
@@ -207,14 +208,36 @@ function App() {
       throw new Error(reason);
     }
 
-    const localStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        facingMode: { ideal: "user" },
-      },
-      audio: false,
-    });
+    let localStream;
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: { ideal: "user" },
+        },
+        audio: false,
+      });
+    } catch (error) {
+      if (error?.name === "NotAllowedError") {
+        throw new Error(
+          "Camera permission denied. Allow camera access in browser site settings and try again."
+        );
+      }
+      if (error?.name === "NotFoundError") {
+        throw new Error(
+          "No camera device found. Connect a camera and retry."
+        );
+      }
+      if (error?.name === "NotReadableError") {
+        throw new Error(
+          "Camera is busy in another app/tab. Close other camera apps and retry."
+        );
+      }
+      throw new Error(
+        "Unable to access camera. Check browser permissions and HTTPS, then retry."
+      );
+    }
     localStreamRef.current = localStream;
     localStream.getTracks().forEach((track) => mediaTrackRegistryRef.current.add(track));
 
@@ -381,6 +404,7 @@ function App() {
 
   const startWorkout = async () => {
     const myStartSequence = ++startSequenceRef.current;
+    setCameraError("");
 
     try {
       const res = await fetch(
@@ -402,6 +426,7 @@ function App() {
       setIsWorkoutActive(true);
     } catch (error) {
       console.error("Start workout error:", error);
+      setCameraError(error?.message || "Could not start camera/workout.");
       stopWebRTC();
       setIsWorkoutActive(false);
 
@@ -420,6 +445,7 @@ function App() {
     // Invalidate any in-flight start attempt so stop always wins.
     startSequenceRef.current += 1;
     setIsWorkoutActive(false);
+    setCameraError("");
 
     try {
       const res = await fetch(apiUrl(`/stop?name=${username}`), {
@@ -453,6 +479,7 @@ function App() {
     setLeaderboard([]);
     setBadgeQueue([]);
     setShowBadge(null);
+    setCameraError("");
     localStorage.removeItem("username");
     setUsername("");
   };
@@ -518,6 +545,8 @@ function App() {
           Stop Workout
         </button>
       </div>
+
+      {cameraError ? <p className="camera-error">{cameraError}</p> : null}
 
       <div className="main">
         {/* CAMERA */}
