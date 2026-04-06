@@ -25,7 +25,17 @@ class PoseDetector:
                 "Install `mediapipe` in this environment."
             )
 
-        self.mp_pose = mp.solutions.pose
+        solutions_module = getattr(mp, "solutions", None)
+        if solutions_module is None:
+            try:
+                from mediapipe.python import solutions as mp_solutions
+            except Exception as exc:  # pragma: no cover
+                raise RuntimeError(
+                    "MediaPipe solutions module is unavailable in this environment."
+                ) from exc
+            solutions_module = mp_solutions
+
+        self.mp_pose = solutions_module.pose
         self.pose = self.mp_pose.Pose(
             static_image_mode=static_image_mode,
             model_complexity=model_complexity,
@@ -33,7 +43,7 @@ class PoseDetector:
             min_detection_confidence=detection_confidence,
             min_tracking_confidence=tracking_confidence,
         )
-        self.mp_draw = mp.solutions.drawing_utils
+        self.mp_draw = solutions_module.drawing_utils
         # Slightly lower visibility threshold avoids dropping usable landmarks.
         self.landmark_filter = LandmarkFilter(visibility_threshold=0.25)
         # Higher alpha tracks motion faster, reducing rep transition lag.

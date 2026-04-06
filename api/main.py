@@ -42,6 +42,13 @@ FRONTEND_BUILD_DIR = Path(__file__).resolve().parent.parent / \
 FRONTEND_STATIC_DIR = FRONTEND_BUILD_DIR / "static"
 FRONTEND_INDEX_FILE = FRONTEND_BUILD_DIR / "index.html"
 
+if FRONTEND_STATIC_DIR.exists():
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(FRONTEND_STATIC_DIR)),
+        name="static",
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -178,13 +185,6 @@ def startup_database() -> None:
         if imported:
             db.commit()
 
-    if FRONTEND_STATIC_DIR.exists():
-        app.mount(
-            "/static",
-            StaticFiles(directory=str(FRONTEND_STATIC_DIR)),
-            name="static",
-        )
-
 
 @app.get("/")
 def root():
@@ -199,6 +199,42 @@ def root():
 def health():
     """Dedicated health endpoint for API uptime checks."""
     return {"message": "AI Gym Trainer API running"}
+
+
+@app.get("/manifest.json")
+def frontend_manifest():
+    manifest_file = FRONTEND_BUILD_DIR / "manifest.json"
+    if manifest_file.exists():
+        return FileResponse(str(manifest_file))
+
+    raise HTTPException(status_code=404, detail="manifest.json not found")
+
+
+@app.get("/favicon.ico")
+def frontend_favicon():
+    favicon_file = FRONTEND_BUILD_DIR / "favicon.ico"
+    if favicon_file.exists():
+        return FileResponse(str(favicon_file))
+
+    raise HTTPException(status_code=404, detail="favicon.ico not found")
+
+
+@app.get("/logo192.png")
+def frontend_logo_192():
+    logo_file = FRONTEND_BUILD_DIR / "logo192.png"
+    if logo_file.exists():
+        return FileResponse(str(logo_file))
+
+    raise HTTPException(status_code=404, detail="logo192.png not found")
+
+
+@app.get("/logo512.png")
+def frontend_logo_512():
+    logo_file = FRONTEND_BUILD_DIR / "logo512.png"
+    if logo_file.exists():
+        return FileResponse(str(logo_file))
+
+    raise HTTPException(status_code=404, detail="logo512.png not found")
 
 
 @app.post("/start")
