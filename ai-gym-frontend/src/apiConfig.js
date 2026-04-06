@@ -1,4 +1,17 @@
-const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+const resolveDefaultApiBaseUrl = () => {
+  if (typeof window === "undefined") {
+    return "http://127.0.0.1:8000";
+  }
+
+  const { hostname, origin } = window.location;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://127.0.0.1:8000";
+  }
+
+  return origin;
+};
+
+const DEFAULT_API_BASE_URL = resolveDefaultApiBaseUrl();
 
 const trimTrailingSlash = (value) => value.replace(/\/+$/, "");
 

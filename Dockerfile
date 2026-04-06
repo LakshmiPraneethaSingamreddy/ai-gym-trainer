@@ -1,3 +1,13 @@
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+COPY ai-gym-frontend/package*.json ./
+RUN npm ci
+
+COPY ai-gym-frontend/ ./
+RUN npm run build
+
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -19,6 +29,8 @@ RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r re
 COPY api ./api
 COPY src ./src
 COPY player_profile.json ./player_profile.json
+COPY ai-gym-frontend/package*.json ./ai-gym-frontend/
+COPY --from=frontend-builder /frontend/build ./ai-gym-frontend/build
 
 # Ensure application files are readable by the runtime user.
 RUN chown -R appuser:appuser /app

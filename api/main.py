@@ -1,6 +1,8 @@
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import json
 import os
@@ -34,6 +36,11 @@ from api.user_store import (
 )
 
 app = FastAPI()
+
+FRONTEND_BUILD_DIR = Path(__file__).resolve().parent.parent / \
+                     "ai-gym-frontend" / "build"
+FRONTEND_STATIC_DIR = FRONTEND_BUILD_DIR / "static"
+FRONTEND_INDEX_FILE = FRONTEND_BUILD_DIR / "index.html"
 
 app.add_middleware(
     CORSMiddleware,
@@ -171,10 +178,26 @@ def startup_database() -> None:
         if imported:
             db.commit()
 
+    if FRONTEND_STATIC_DIR.exists():
+        app.mount(
+            "/static",
+            StaticFiles(directory=str(FRONTEND_STATIC_DIR)),
+            name="static",
+        )
+
 
 @app.get("/")
 def root():
-    """Health check endpoint."""
+    """Serve frontend index when available, otherwise return API health JSON."""
+    if FRONTEND_INDEX_FILE.exists():
+        return FileResponse(str(FRONTEND_INDEX_FILE))
+
+    return {"message": "AI Gym Trainer API running"}
+
+
+@app.get("/health")
+def health():
+    """Dedicated health endpoint for API uptime checks."""
     return {"message": "AI Gym Trainer API running"}
 
 
@@ -597,3 +620,12 @@ def delete_user(name: str, db: Session = Depends(get_db)):
         "deleted": deleted_name,
         "xp": deleted_xp,
     }
+
+
+@app.get("/{full_path:path}")
+def frontend_fallback(full_path: str):
+    """Serve React index.html for client-side routes when build artifacts exist."""
+    if FRONTEND_INDEX_FILE.exists():
+        return FileResponse(str(FRONTEND_INDEX_FILE))
+
+    raise HTTPException(status_code=404, detail="Not found")
