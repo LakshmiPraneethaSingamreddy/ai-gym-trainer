@@ -30,10 +30,10 @@ class LandmarkFilter:
                 filtered.append(lm)
             else:
                 # fallback to previous landmark if available
-                if self.prev_landmarks is not None:
-                    filtered.append(self.prev_landmarks[i])
-                else:
-                    filtered.append(lm)
+                # if self.prev_landmarks is not None:
+                #     filtered.append(self.prev_landmarks[i])
+                # else:
+                filtered.append(lm)
 
         # store a deep copy to avoid mutation issues
         self.prev_landmarks = copy.deepcopy(filtered)

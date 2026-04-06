@@ -1,9 +1,5 @@
 import cv2
-import importlib
-try:
-    import mediapipe as mp
-except ImportError:  # pragma: no cover - handled at runtime in __init__
-    mp = None
+import mediapipe as mp
 from src.cv.landmark_filter import LandmarkFilter
 from src.cv.temporal_smoother import TemporalSmoother
 from src.cv.pose_validator import PoseValidator
@@ -20,12 +16,6 @@ class PoseDetector:
         detection_confidence=0.5,
         tracking_confidence=0.5,
     ):
-        if mp is None:
-            raise RuntimeError(
-                "MediaPipe is required for PoseDetector. "
-                "Install `mediapipe` in this environment."
-            )
-
         self.mp_pose, self.mp_draw = self._resolve_mediapipe_modules()
         self.pose = self.mp_pose.Pose(
             static_image_mode=static_image_mode,
@@ -49,21 +39,22 @@ class PoseDetector:
         if solutions_module is not None:
             return solutions_module.pose, solutions_module.drawing_utils
 
-        import_candidates = [
-            (
-                "mediapipe.python.solutions.pose",
-                "mediapipe.python.solutions.drawing_utils",
-            ),
-            ("mediapipe.solutions.pose", "mediapipe.solutions.drawing_utils"),
-        ]
-
-        for pose_module_path, drawing_module_path in import_candidates:
-            try:
-                pose_module = importlib.import_module(pose_module_path)
-                drawing_module = importlib.import_module(drawing_module_path)
-                return pose_module, drawing_module
-            except Exception:
-                continue
+        # Older MediaPipe layout fallback kept commented out while deployment behavior is isolated.
+        # import_candidates = [
+        #     (
+        #         "mediapipe.python.solutions.pose",
+        #         "mediapipe.python.solutions.drawing_utils",
+        #     ),
+        #     ("mediapipe.solutions.pose", "mediapipe.solutions.drawing_utils"),
+        # ]
+        #
+        # for pose_module_path, drawing_module_path in import_candidates:
+        #     try:
+        #         pose_module = importlib.import_module(pose_module_path)
+        #         drawing_module = importlib.import_module(drawing_module_path)
+        #         return pose_module, drawing_module
+        #     except Exception:
+        #         continue
 
         raise RuntimeError(
             "MediaPipe solutions module is unavailable in this environment."

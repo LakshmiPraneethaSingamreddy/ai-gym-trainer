@@ -1,19 +1,16 @@
-from enum import IntEnum
 from typing import List
 
-try:
-    # Newer MediaPipe wheels expose solutions directly under `mediapipe.solutions`.
-    from mediapipe.solutions.pose import PoseLandmark
-except ImportError:  # pragma: no cover - fallback for older MediaPipe layouts
-    try:
-        from mediapipe.python.solutions.pose import PoseLandmark
-    except ImportError:  # pragma: no cover
-        # Minimal fallback for test/runtime import safety.
-        class PoseLandmark(IntEnum):
-            LEFT_SHOULDER = 11
-            RIGHT_SHOULDER = 12
-            LEFT_HIP = 23
-            RIGHT_HIP = 24
+from mediapipe.solutions.pose import PoseLandmark
+
+# Old layout fallback kept commented for now while MediaPipe deployment issues are being isolated.
+# try:
+#     from mediapipe.python.solutions.pose import PoseLandmark
+# except ImportError:
+#     class PoseLandmark(IntEnum):
+#         LEFT_SHOULDER = 11
+#         RIGHT_SHOULDER = 12
+#         LEFT_HIP = 23
+#         RIGHT_HIP = 24
 
 
 class PoseValidator:
