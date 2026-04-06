@@ -16,6 +16,13 @@ class FeedbackController:
         self.display_timer = 0
         self.DISPLAY_FRAMES = 90  # show feedback ~3 seconds
 
+    def reset(self):
+        """Clear cached and pending feedback, e.g., when switching exercises."""
+        self.pending_feedback = None
+        self.frames_since_feedback = 0
+        self.display_feedback = None
+        self.display_timer = 0
+
     def update(self, exercise, state_name, raw_feedback):
         """Process and display feedback based on state and exercise.
         

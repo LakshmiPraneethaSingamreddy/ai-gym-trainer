@@ -208,6 +208,7 @@ class WorkoutEngine:
 
         # Always reset when start is requested to avoid stale progression.
         self._reset_session_state()
+        self.feedback_controller.reset()
 
         with self._state_lock:
             self.state["exercise"] = selected_name

@@ -20,7 +20,7 @@ class PushupStateMachine:
         # Regular pushups usually read a little shallower than knee pushups,
         # so we keep two depth gates to avoid missing valid reps.
         self.regular_bottom_threshold = 120
-        self.knee_bottom_threshold = 96
+        self.knee_bottom_threshold = 124
         self.top_threshold = 160
         self.knee_mode_knee_angle = 160
         self.direction_delta = 3

@@ -4,6 +4,8 @@ from src.ai.angles import AngleCalculator
 class PlankFormValidator:
     def __init__(self):
         self.feedback = []
+        self.min_body_angle = 150
+        self.hip_vertical_tolerance = 0.09
 
     def validate(self, landmarks):
         self.feedback.clear()
@@ -19,16 +21,16 @@ class PlankFormValidator:
         # --- Body alignment angle ---
         body_angle = AngleCalculator.calculate_angle(shoulder, hip, ankle)
 
-        # Ideal plank ≈ 170–180 degrees
-        if body_angle < 155:
+        # Allow a wider body-angle band so minor camera jitter does not spam feedback.
+        if body_angle < self.min_body_angle:
             self.feedback.append("Keep your whole body in a strong line 💪")
 
         # Hip position check (avoid sagging)
-        if hip["y"] > shoulder["y"] + 0.06:
+        if hip["y"] > shoulder["y"] + self.hip_vertical_tolerance:
             self.feedback.append("Hips up! No sagging 📍")
 
         # Avoid piking
-        if hip["y"] < shoulder["y"] - 0.06:
+        if hip["y"] < shoulder["y"] - self.hip_vertical_tolerance:
             self.feedback.append("Lower those hips just a bit ⬇️")
 
         if not self.feedback:

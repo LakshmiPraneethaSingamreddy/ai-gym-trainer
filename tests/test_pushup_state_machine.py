@@ -131,6 +131,23 @@ def test_pushup_state_machine_counts_regular_pushup_with_standard_depth():
     assert reps == 1
 
 
+def test_pushup_state_machine_counts_shallower_knee_pushup():
+    machine = PushupStateMachine()
+    counter = PushupRepCounter()
+
+    # Real knee pushups can be a bit shallower than regular pushups.
+    sequence = [180, 140, 120, 170]
+    reps = 0
+
+    for elbow_angle in sequence:
+        state = machine.update(_build_landmarks(elbow_angle, 90))
+        reps = counter.update(state.name, machine.reached_bottom)
+
+    assert machine.is_knee_pushup is True
+    assert machine.state == PushupState.UP
+    assert reps == 1
+
+
 def test_pushup_state_machine_ignores_sitting_elbow_motion():
     machine = PushupStateMachine()
     counter = PushupRepCounter()

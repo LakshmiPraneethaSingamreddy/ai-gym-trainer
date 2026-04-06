@@ -11,26 +11,36 @@ class LungeFormValidator:
         if not landmarks:
             return ["No pose detected"]
 
-        knee = landmarks[25]  # LEFT_KNEE
-        ankle = landmarks[27]  # LEFT_ANKLE
+        # Detect which leg is bending more (active leg)
+        left_knee_angle = AngleCalculator.knee_angle(landmarks, side="left")
+        right_knee_angle = AngleCalculator.knee_angle(landmarks, side="right")
+        
+        # Use the leg that is bending more (smaller angle = more bent)
+        side = "left" if left_knee_angle < right_knee_angle else "right"
+        
+        if side == "left":
+            knee = landmarks[25]  # LEFT_KNEE
+            ankle = landmarks[27]  # LEFT_ANKLE
+        else:
+            knee = landmarks[26]  # RIGHT_KNEE
+            ankle = landmarks[28]  # RIGHT_ANKLE
 
         # --- Angles ---
-        knee_angle = AngleCalculator.knee_angle(landmarks, side="left")
-        torso_angle = AngleCalculator.hip_angle(landmarks, side="left")
+        knee_angle = AngleCalculator.knee_angle(landmarks, side=side)
+        torso_angle = AngleCalculator.hip_angle(landmarks, side=side)
 
         # --- Rules ---
 
-        # Depth
-        if knee_angle > 118:
+        # Depth (very lenient - almost any lunge depth is accepted)
+        if knee_angle > 145:
             self.feedback.append("Lunge lower for better form 🦵")
 
-        # Knee alignment (rough inward collapse check)
-        # Loosened threshold to 0.12 to allow natural knee position variance
-        if knee["x"] < ankle["x"] - 0.12:
-            self.feedback.append("Front knee tracking over your toes ✨")
+        # Knee alignment (extra-loose tolerance)
+        if knee["x"] < ankle["x"] - 0.40:
+            self.feedback.append("Keep your front knee aligned over your toes ✨")
 
-        # Upright torso
-        if torso_angle < 145:
+        # Upright torso (only trigger if extremely forward leaned)
+        if torso_angle < 80:
             self.feedback.append("Keep your torso more upright 🏋️")
 
         if not self.feedback:
