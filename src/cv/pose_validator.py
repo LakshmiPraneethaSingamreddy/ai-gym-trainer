@@ -1,5 +1,10 @@
 from typing import List
-from mediapipe.python.solutions.pose import PoseLandmark
+
+try:
+    # Newer MediaPipe wheels expose solutions directly under `mediapipe.solutions`.
+    from mediapipe.solutions.pose import PoseLandmark
+except ImportError:  # pragma: no cover - fallback for older MediaPipe layouts
+    from mediapipe.python.solutions.pose import PoseLandmark
 
 
 class PoseValidator:
