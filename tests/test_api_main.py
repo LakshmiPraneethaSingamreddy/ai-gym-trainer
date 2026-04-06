@@ -82,7 +82,9 @@ class TestApiMainIntegration:
         monkeypatch.setattr(main, "engine", DummyEngine())
         return player_file
 
-    def test_signin_creates_player_and_updates_engine_state(self, tmp_path, monkeypatch):
+    def test_signin_creates_player_and_updates_engine_state(
+        self, tmp_path, monkeypatch
+    ):
         player_file = self._set_temp_player_file(tmp_path, monkeypatch)
 
         response = self.client.post("/signin", params={"name": "Alice"})
@@ -134,7 +136,9 @@ class TestApiMainIntegration:
         assert saved["Nina"]["history"][0]["reps"] == 12
         assert saved["Nina"]["history"][0]["exercise"] == "Low Plank"
 
-    def test_signout_returns_signed_out_without_active_workout(self, tmp_path, monkeypatch):
+    def test_signout_returns_signed_out_without_active_workout(
+        self, tmp_path, monkeypatch
+    ):
         self._set_temp_player_file(tmp_path, monkeypatch)
 
         response = self.client.post("/signout", params={"name": "Maya"})
@@ -142,7 +146,9 @@ class TestApiMainIntegration:
         assert response.status_code == 200
         assert response.json() == {"status": "signed_out"}
 
-    def test_signout_stops_active_workout_and_persists_progress(self, tmp_path, monkeypatch):
+    def test_signout_stops_active_workout_and_persists_progress(
+        self, tmp_path, monkeypatch
+    ):
         player_file = self._set_temp_player_file(tmp_path, monkeypatch)
         engine = main.engine
         engine.running = True

@@ -6,7 +6,7 @@ class ExerciseRegistry:
 
     def register(self, exercise):
         """Register an exercise implementation.
-        
+
         Args:
             exercise: Exercise instance with name property.
         """
@@ -14,10 +14,10 @@ class ExerciseRegistry:
 
     def get(self, name):
         """Get registered exercise by name.
-        
+
         Args:
             name: Exercise name.
-        
+
         Returns:
             Exercise implementation or None.
         """

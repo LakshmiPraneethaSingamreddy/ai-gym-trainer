@@ -48,11 +48,11 @@ engine = WorkoutEngine()
 
 def env_flag(name: str, default: str = "1") -> bool:
     """Parse environment variable as boolean flag.
-    
+
     Args:
         name: Environment variable name.
         default: Default value if not set.
-    
+
     Returns:
         bool: True if value is '1', 'true', 'yes', or 'on'.
     """
@@ -68,7 +68,9 @@ class RTCOffer(BaseModel):
     sdp: str
     type: str
 
-LEGACY_PLAYER_FILE = Path(__file__).resolve().parent.parent / "src" / "data" / "players.json"
+
+LEGACY_PLAYER_FILE = Path(__file__).resolve().parent.parent / \
+                          "src" / "data" / "players.json"
 PLAYER_FILE = LEGACY_PLAYER_FILE
 
 
@@ -92,7 +94,9 @@ class UserPatch(BaseModel):
     history: Optional[list[SessionHistoryItem]] = None
 
 
-def validate_user_numbers(xp: Optional[int] = None, level: Optional[int] = None) -> None:
+def validate_user_numbers(
+    xp: Optional[int] = None, level: Optional[int] = None
+) -> None:
     if xp is not None and xp < 0:
         raise HTTPException(status_code=400, detail="XP must be 0 or greater")
     if level is not None and level < 1:
@@ -120,7 +124,9 @@ def sync_engine_player(user: User) -> None:
     with engine._state_lock:
         engine.state["xp"] = engine.player.xp
         engine.state["level"] = engine.player.level
-        engine.state["xp_required"] = engine.level_system.xp_needed(engine.player.level)
+        engine.state["xp_required"] = engine.level_system.xp_needed(
+            engine.player.level
+        )
 
 
 def default_player():
@@ -158,7 +164,7 @@ def ensure_player(players: dict, name: str):
 
 @app.on_event("startup")
 def startup_database() -> None:
-    """Initialize database on startup. Create tables and import legacy JSON data if db is empty."""
+    """Initialize DB, create tables, and import legacy JSON when database is empty."""
     Base.metadata.create_all(bind=db_engine)
     with SessionLocal() as db:
         imported = import_legacy_json_if_empty(db, LEGACY_PLAYER_FILE)
@@ -173,19 +179,26 @@ def root():
 
 
 @app.post("/start")
-def start_workout(exercise: str = "Squat", name: str = "You", use_backend_camera: Optional[bool] = None):
+def start_workout(
+    exercise: str = "Squat",
+    name: str = "You",
+    use_backend_camera: Optional[bool] = None,
+):
     """Start a workout session with specified exercise.
-    
+
     Args:
-        exercise: Exercise type (Squat, Knee/Regular Pushups, Lunge, Low Plank, JumpingJack).
+        exercise: Exercise type (Squat, Knee/Regular Pushups,
+            Lunge, Low Plank, JumpingJack).
         name: User identifier for tracking.
         use_backend_camera: Override USE_BACKEND_CAMERA setting.
-    
+
     Returns:
         dict: Status and selected exercise name.
     """
     selected_exercise = engine.set_exercise(exercise)
-    camera_mode = USE_BACKEND_CAMERA if use_backend_camera is None else use_backend_camera
+    camera_mode = (
+        USE_BACKEND_CAMERA if use_backend_camera is None else use_backend_camera
+    )
     engine.start(use_camera=camera_mode, render_frames=SEND_WS_FRAMES)
     return {"status": "started", "exercise": selected_exercise}
 
@@ -193,11 +206,11 @@ def start_workout(exercise: str = "Squat", name: str = "You", use_backend_camera
 @app.post("/stop")
 def stop_workout(name: str = "You", db: Session = Depends(get_db)):
     """End workout and save session data to database.
-    
+
     Args:
         name: User identifier.
         db: Database session.
-    
+
     Returns:
         dict: Status confirmation.
     """
@@ -306,7 +319,7 @@ async def on_shutdown():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """Maintain real-time WebSocket connection for live workout state updates.
-    
+
     Streams: frame data, landmarks, reps, XP, level, and badge notifications.
     """
     await websocket.accept()
@@ -396,7 +409,10 @@ def get_leaderboard(db: Session = Depends(get_db)):
         players = load_players()
         if players:
             return sorted(
-                [{"name": name, "xp": int(record.get("xp", 0) or 0)} for name, record in players.items()],
+                [
+                    {"name": name, "xp": int(record.get("xp", 0) or 0)}
+                    for name, record in players.items()
+                ],
                 key=lambda item: item["xp"],
                 reverse=True,
             )[:10]
@@ -407,7 +423,10 @@ def get_leaderboard(db: Session = Depends(get_db)):
 
     players = load_players()
     return sorted(
-        [{"name": name, "xp": int(record.get("xp", 0) or 0)} for name, record in players.items()],
+        [
+            {"name": name, "xp": int(record.get("xp", 0) or 0)}
+            for name, record in players.items()
+        ],
         key=lambda item: item["xp"],
         reverse=True,
     )[:10]
@@ -416,10 +435,10 @@ def get_leaderboard(db: Session = Depends(get_db)):
 @app.get("/history")
 def get_history(name: str, db: Session = Depends(get_db)):
     """Get workout history for user.
-    
+
     Args:
         name: Username.
-    
+
     Returns:
         list: Workout entries with date, reps, and exercise type.
     """
@@ -494,7 +513,11 @@ def get_user(name: str, db: Session = Depends(get_db)):
 
 
 @app.post("/users/{name}")
-def create_user(name: str, data: Optional[UserData] = None, db: Session = Depends(get_db)):
+def create_user(
+    name: str,
+    data: Optional[UserData] = None,
+    db: Session = Depends(get_db),
+):
     try:
         clean_name = normalize_name(name)
     except ValueError as exc:
@@ -512,7 +535,8 @@ def create_user(name: str, data: Optional[UserData] = None, db: Session = Depend
         try:
             for item in data.history:
                 parsed_date = parse_history_date(item.date)
-                add_history_item(db, user, reps=item.reps, exercise=item.exercise, when=parsed_date)
+                add_history_item(db, user, reps=item.reps,
+                                 exercise=item.exercise, when=parsed_date)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -544,7 +568,8 @@ def upsert_user(name: str, patch: UserPatch, db: Session = Depends(get_db)):
         try:
             for item in patch.history:
                 parsed_date = parse_history_date(item.date)
-                add_history_item(db, user, reps=item.reps, exercise=item.exercise, when=parsed_date)
+                add_history_item(db, user, reps=item.reps,
+                                 exercise=item.exercise, when=parsed_date)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

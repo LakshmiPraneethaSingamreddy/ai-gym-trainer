@@ -14,10 +14,10 @@ class LungeFormValidator:
         # Detect which leg is bending more (active leg)
         left_knee_angle = AngleCalculator.knee_angle(landmarks, side="left")
         right_knee_angle = AngleCalculator.knee_angle(landmarks, side="right")
-        
+
         # Use the leg that is bending more (smaller angle = more bent)
         side = "left" if left_knee_angle < right_knee_angle else "right"
-        
+
         if side == "left":
             knee = landmarks[25]  # LEFT_KNEE
             ankle = landmarks[27]  # LEFT_ANKLE

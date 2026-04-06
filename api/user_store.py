@@ -14,13 +14,13 @@ ALLOWED_NAME_RE = re.compile(r"^[A-Za-z0-9 _.-]+$")
 
 def normalize_name(name: str) -> str:
     """Normalize and validate username.
-    
+
     Args:
         name: Raw username input.
-    
+
     Returns:
         str: Cleaned username.
-    
+
     Raises:
         ValueError: If name is empty, too long, or contains invalid characters.
     """
@@ -30,17 +30,18 @@ def normalize_name(name: str) -> str:
     if len(cleaned) > 40:
         raise ValueError("User name cannot exceed 40 characters")
     if not ALLOWED_NAME_RE.match(cleaned):
-        raise ValueError("User name can contain only letters, numbers, spaces, _, -, and .")
+        raise ValueError(
+            "User name can contain only letters, numbers, spaces, _, -, and .")
     return cleaned
 
 
 def create_user_if_missing(db: Session, name: str) -> User:
     """Create user if not exists, else return existing.
-    
+
     Args:
         db: Database session.
         name: Username.
-    
+
     Returns:
         User: User instance (new or existing).
     """
@@ -57,11 +58,11 @@ def create_user_if_missing(db: Session, name: str) -> User:
 
 def get_user_by_name(db: Session, name: str) -> User | None:
     """Fetch user from database by name.
-    
+
     Args:
         db: Database session.
         name: Username.
-    
+
     Returns:
         User or None if not found.
     """
@@ -71,11 +72,11 @@ def get_user_by_name(db: Session, name: str) -> User | None:
 
 def user_to_dict(user: User, include_history: bool = True) -> dict:
     """Convert User object to dictionary payload.
-    
+
     Args:
         user: User instance.
         include_history: Whether to include workout history.
-    
+
     Returns:
         dict: User data with XP, level, badges, and optionally history.
     """
@@ -104,15 +105,20 @@ def list_users_payload(db: Session) -> dict:
     return {"count": len(payload), "users": payload}
 
 
-def update_user(db: Session, user: User, xp: int | None = None, level: int | None = None) -> User:
+def update_user(
+    db: Session,
+    user: User,
+    xp: int | None = None,
+    level: int | None = None,
+) -> User:
     """Update user XP and level.
-    
+
     Args:
         db: Database session.
         user: User to update.
         xp: New XP value (must be >= 0).
         level: New level (must be >= 1).
-    
+
     Returns:
         User: Updated user instance.
     """
@@ -142,7 +148,7 @@ def set_user_badges(db: Session, user: User, badges: list[str]) -> None:
 
 def add_badges(db: Session, user: User, new_badges: list[str]) -> None:
     """Add new badges to user, skipping duplicates.
-    
+
     Args:
         db: Database session.
         user: User instance.
@@ -157,9 +163,15 @@ def add_badges(db: Session, user: User, new_badges: list[str]) -> None:
     db.flush()
 
 
-def add_history_item(db: Session, user: User, reps: int, exercise: str, when: datetime | None = None) -> None:
+def add_history_item(
+    db: Session,
+    user: User,
+    reps: int,
+    exercise: str,
+    when: datetime | None = None,
+) -> None:
     """Record workout entry in user history.
-    
+
     Args:
         db: Database session.
         user: User instance.
@@ -210,11 +222,11 @@ def get_user_history_payload(db: Session, name: str) -> list[dict]:
 
 def get_leaderboard_payload(db: Session, top_n: int = 10) -> list[dict]:
     """Get top N users ranked by XP.
-    
+
     Args:
         db: Database session.
         top_n: Number of top users to return.
-    
+
     Returns:
         list: User objects sorted by XP descending.
     """
@@ -224,11 +236,11 @@ def get_leaderboard_payload(db: Session, top_n: int = 10) -> list[dict]:
 
 def import_legacy_json_if_empty(db: Session, json_path: Path) -> int:
     """One-time migration: import legacy JSON data to database if db is empty.
-    
+
     Args:
         db: Database session.
         json_path: Path to legacy players.json file.
-    
+
     Returns:
         int: Number of users imported (0 if none).
     """
@@ -255,7 +267,8 @@ def import_legacy_json_if_empty(db: Session, json_path: Path) -> int:
         except ValueError:
             continue
 
-        update_user(db, user, xp=int(record.get("xp", 0) or 0), level=int(record.get("level", 1) or 1))
+        update_user(db, user, xp=int(record.get("xp", 0) or 0),
+                    level=int(record.get("level", 1) or 1))
 
         badges = record.get("badges", [])
         if isinstance(badges, list):

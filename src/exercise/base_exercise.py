@@ -3,8 +3,9 @@ from abc import ABC, abstractmethod
 
 class BaseExercise(ABC):
     """Abstract base class for exercise implementations.
-    
-    Defines the interface for state management, rep counting, form validation, and scoring.
+
+    Defines the interface for state management, rep counting,
+    form validation, and scoring.
     """
 
     FEEDBACK_STATES = []

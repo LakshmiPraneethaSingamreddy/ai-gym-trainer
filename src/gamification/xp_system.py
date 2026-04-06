@@ -3,10 +3,10 @@ class XPSystem:
 
     def calculate_rep_xp(self, score):
         """Calculate XP for a single rep based on quality score.
-        
+
         Args:
             score: Rep quality score (0-100).
-        
+
         Returns:
             int: XP awarded (0-10 per rep).
         """
@@ -24,10 +24,10 @@ class XPSystem:
 
     def calculate_xp(self, summary):
         """Calculate total XP for a workout session.
-        
+
         Args:
             summary: Workout summary with total_reps and avg_score.
-        
+
         Returns:
             int: Total XP for session (capped at 30).
         """

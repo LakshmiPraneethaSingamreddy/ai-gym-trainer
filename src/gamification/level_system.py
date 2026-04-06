@@ -3,24 +3,24 @@ class LevelSystem:
 
     def xp_needed(self, level):
         """Get XP required to reach next level.
-        
+
         Args:
             level: Current level.
-        
+
         Returns:
             int: XP needed for next level (500 * level).
         """
         # Exponential progression: each level costs roughly 1.5x previous
-        # Level 1 → 500 XP
-        # Level 2 → 1000 XP
-        # Level 3 → 1500 XP
-        # Level 4 → 2000 XP
+        # Level 1 â†’ 500 XP
+        # Level 2 â†’ 1000 XP
+        # Level 3 â†’ 1500 XP
+        # Level 4 â†’ 2000 XP
         # etc.
         return int(500 * level)
 
     def check_level_up(self, player):
         """Check and apply level ups if XP threshold reached.
-        
+
         Args:
             player: Player profile to update.
         """

@@ -36,10 +36,23 @@ def _build_test_client():
 
     client = TestClient(main_module.app)
 
-    return client, tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file
+    return (
+        client,
+        tmp_dir,
+        test_engine,
+        original_engine,
+        original_session_local,
+        original_legacy_file,
+    )
 
 
-def _cleanup_test_client(tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file):
+def _cleanup_test_client(
+    tmp_dir,
+    test_engine,
+    original_engine,
+    original_session_local,
+    original_legacy_file,
+):
     main_module.app.dependency_overrides.clear()
     main_module.db_engine = original_engine
     main_module.SessionLocal = original_session_local
@@ -49,7 +62,14 @@ def _cleanup_test_client(tmp_dir, test_engine, original_engine, original_session
 
 
 def test_signin_creates_user_and_returns_defaults():
-    client, tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file = _build_test_client()
+    (
+        client,
+        tmp_dir,
+        test_engine,
+        original_engine,
+        original_session_local,
+        original_legacy_file,
+    ) = _build_test_client()
     try:
         response = client.post("/signin", params={"name": "demo-login-user"})
         assert response.status_code == 200
@@ -59,11 +79,19 @@ def test_signin_creates_user_and_returns_defaults():
         assert payload["xp"] == 0
         assert payload["level"] == 1
     finally:
-        _cleanup_test_client(tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file)
+        _cleanup_test_client(tmp_dir, test_engine, original_engine,
+                             original_session_local, original_legacy_file)
 
 
 def test_upsert_updates_xp_and_level():
-    client, tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file = _build_test_client()
+    (
+        client,
+        tmp_dir,
+        test_engine,
+        original_engine,
+        original_session_local,
+        original_legacy_file,
+    ) = _build_test_client()
     try:
         client.post("/signin", params={"name": "demo-update-user"})
 
@@ -79,18 +107,27 @@ def test_upsert_updates_xp_and_level():
         assert payload["level"] == 3
         assert "starter" in payload["badges"]
     finally:
-        _cleanup_test_client(tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file)
+        _cleanup_test_client(tmp_dir, test_engine, original_engine,
+                             original_session_local, original_legacy_file)
 
 
 def test_history_retrieval_returns_inserted_items():
-    client, tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file = _build_test_client()
+    (
+        client,
+        tmp_dir,
+        test_engine,
+        original_engine,
+        original_session_local,
+        original_legacy_file,
+    ) = _build_test_client()
     try:
         response = client.put(
             "/users/demo-history-user",
             json={
                 "history": [
                     {"date": "2026-03-30T10:00:00", "reps": 12, "exercise": "Squat"},
-                    {"date": "2026-03-30T11:00:00", "reps": 10, "exercise": "Knee/Regular Pushups"},
+                    {"date": "2026-03-30T11:00:00", "reps": 10,
+                        "exercise": "Knee/Regular Pushups"},
                 ]
             },
         )
@@ -104,4 +141,5 @@ def test_history_retrieval_returns_inserted_items():
         assert history[0]["exercise"] == "Squat"
         assert history[1]["exercise"] == "Knee/Regular Pushups"
     finally:
-        _cleanup_test_client(tmp_dir, test_engine, original_engine, original_session_local, original_legacy_file)
+        _cleanup_test_client(tmp_dir, test_engine, original_engine,
+                             original_session_local, original_legacy_file)

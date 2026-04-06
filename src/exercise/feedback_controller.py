@@ -11,7 +11,7 @@ class FeedbackController:
         self.frames_since_feedback = 0
         self.MAX_WAIT_FRAMES = 45  # ~1.5 sec @30fps
 
-        # ✅ NEW — display duration system
+        # âœ… NEW â€” display duration system
         self.display_feedback = None
         self.display_timer = 0
         self.DISPLAY_FRAMES = 90  # show feedback ~3 seconds
@@ -25,12 +25,12 @@ class FeedbackController:
 
     def update(self, exercise, state_name, raw_feedback):
         """Process and display feedback based on state and exercise.
-        
+
         Args:
             exercise: Current exercise object.
             state_name: Current exercise state.
             raw_feedback: Raw feedback from validator.
-        
+
         Returns:
             Feedback message or None if not in valid state.
         """
@@ -41,7 +41,7 @@ class FeedbackController:
         """
 
         # -------------------------------------------------
-        # ✅ STEP 1 — keep showing existing feedback
+        # âœ… STEP 1 â€” keep showing existing feedback
         # -------------------------------------------------
         if self.display_timer > 0:
             self.display_timer -= 1
@@ -56,12 +56,12 @@ class FeedbackController:
             self.frames_since_feedback += 1
             return None
 
-        # ✅ Show only in valid state
+        # âœ… Show only in valid state
         if exercise.allow_feedback(state_name):
             self.pending_feedback = None
             self.frames_since_feedback = 0
 
-            # ✅ NEW: lock feedback for display duration
+            # âœ… NEW: lock feedback for display duration
             self.display_feedback = raw_feedback
             self.display_timer = self.DISPLAY_FRAMES
 
@@ -71,13 +71,13 @@ class FeedbackController:
         self.pending_feedback = raw_feedback
         self.frames_since_feedback += 1
 
-        # ✅ Safety: user never reached correct state
+        # âœ… Safety: user never reached correct state
         if self.frames_since_feedback > self.MAX_WAIT_FRAMES:
             fb = self.pending_feedback
             self.pending_feedback = None
             self.frames_since_feedback = 0
 
-            # ✅ NEW: lock feedback display
+            # âœ… NEW: lock feedback display
             self.display_feedback = fb
             self.display_timer = self.DISPLAY_FRAMES
 

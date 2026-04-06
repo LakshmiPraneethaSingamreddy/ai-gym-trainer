@@ -8,7 +8,7 @@ class BadgeSystem:
 
     def __init__(self, player_profile):
         """Initialize badge system with available badges from registry.
-        
+
         Args:
             player_profile: Player instance to track badges for.
         """
@@ -23,10 +23,10 @@ class BadgeSystem:
     # ----------------------------------
     def evaluate(self, summary):
         """Evaluate if any new badges are earned based on workout summary.
-        
+
         Args:
             summary: Workout summary with stats.
-        
+
         Returns:
             list: Newly unlocked Badge objects.
         """
@@ -48,11 +48,11 @@ class BadgeSystem:
     # ----------------------------------
     def _check_condition(self, badge_id, summary):
         """Check if badge unlock condition is met.
-        
+
         Args:
             badge_id: Badge identifier.
             summary: Workout summary.
-        
+
         Returns:
             bool: Whether condition is satisfied.
         """

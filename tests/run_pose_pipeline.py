@@ -20,7 +20,8 @@ from src.gamification.badge_system import BadgeSystem
 from src.gamification.leaderboard_system import LeaderboardSystem
 
 # choose exercise
-ACTIVE_EXERCISE = "Squat"  # Options: "Squat", "Knee/Regular Pushups", "Lunge", "Low Plank", "JumpingJack"
+# Options: "Squat", "Knee/Regular Pushups", "Lunge", "Low Plank", "JumpingJack"
+ACTIVE_EXERCISE = "Squat"
 
 
 def main():

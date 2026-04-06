@@ -24,7 +24,7 @@ class WorkoutSession:
     # --------------------------------------------------
     def update(self, reps, score, feedback):
         """Update session with rep and feedback data.
-        
+
         Args:
             reps: Current rep count.
             score: Quality score for current rep.
@@ -54,10 +54,10 @@ class WorkoutSession:
     # --------------------------------------------------
     def get_summary(self, exercise_name):
         """Generate workout summary with statistics.
-        
+
         Args:
             exercise_name: Name of exercise performed.
-        
+
         Returns:
             dict: Summary with reps, duration, average score, feedback log.
         """

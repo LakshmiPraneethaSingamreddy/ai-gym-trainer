@@ -36,10 +36,10 @@ class PoseDetector:
 
     def process(self, frame):
         """Process frame and detect pose landmarks.
-        
+
         Args:
             frame: BGR image frame.
-        
+
         Returns:
             MediaPipe pose detection results.
         """
@@ -56,10 +56,10 @@ class PoseDetector:
 
     def extract_landmarks(self, frame):
         """Extract normalized landmarks from frame.
-        
+
         Args:
             frame: BGR image frame.
-        
+
         Returns:
             list: Normalized 3D landmark coordinates.
         """
