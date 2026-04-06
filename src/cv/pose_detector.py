@@ -1,5 +1,8 @@
 import cv2
-import mediapipe as mp
+try:
+    import mediapipe as mp
+except ImportError:  # pragma: no cover - handled at runtime in __init__
+    mp = None
 from src.cv.landmark_filter import LandmarkFilter
 from src.cv.temporal_smoother import TemporalSmoother
 from src.cv.pose_validator import PoseValidator
@@ -16,6 +19,11 @@ class PoseDetector:
         detection_confidence=0.5,
         tracking_confidence=0.5,
     ):
+        if mp is None:
+            raise RuntimeError(
+                "MediaPipe is required for PoseDetector. "
+                "Install `mediapipe` in this environment."
+            )
 
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
