@@ -1,9 +1,14 @@
 import json
+import tempfile
 import threading
+from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 import api.main as main
+from api.db import Base, get_db
 
 
 class DummyPlayer:
@@ -73,19 +78,47 @@ class TestApiMainUnit:
 
 class TestApiMainIntegration:
     def setup_method(self):
+        self._tmp_dir = tempfile.TemporaryDirectory()
+        db_path = Path(self._tmp_dir.name) / "test_api_main.db"
+        db_url = f"sqlite:///{db_path}"
+
+        self._test_engine = create_engine(
+            db_url,
+            connect_args={"check_same_thread": False},
+        )
+        self._test_session_local = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=self._test_engine,
+        )
+        Base.metadata.create_all(bind=self._test_engine)
+
+        def override_get_db():
+            db = self._test_session_local()
+            try:
+                yield db
+            finally:
+                db.close()
+
+        main.app.dependency_overrides[get_db] = override_get_db
         self.client = TestClient(main.app)
 
-    def _set_temp_player_file(self, tmp_path, monkeypatch):
-        player_file = tmp_path / "players.json"
+    def teardown_method(self):
+        main.app.dependency_overrides.clear()
+        self._test_engine.dispose()
+        self._tmp_dir.cleanup()
+
+    def _set_temp_player_file(self, monkeypatch):
+        player_file = Path(self._tmp_dir.name) / "players.json"
         player_file.write_text("{}", encoding="utf-8")
         monkeypatch.setattr(main, "PLAYER_FILE", str(player_file))
         monkeypatch.setattr(main, "engine", DummyEngine())
         return player_file
 
     def test_signin_creates_player_and_updates_engine_state(
-        self, tmp_path, monkeypatch
+        self, monkeypatch
     ):
-        player_file = self._set_temp_player_file(tmp_path, monkeypatch)
+        player_file = self._set_temp_player_file(monkeypatch)
 
         response = self.client.post("/signin", params={"name": "Alice"})
 
@@ -96,8 +129,8 @@ class TestApiMainIntegration:
         saved = json.loads(player_file.read_text(encoding="utf-8"))
         assert "Alice" in saved
 
-    def test_leaderboard_returns_sorted_by_xp(self, tmp_path, monkeypatch):
-        player_file = self._set_temp_player_file(tmp_path, monkeypatch)
+    def test_leaderboard_returns_sorted_by_xp(self, monkeypatch):
+        player_file = self._set_temp_player_file(monkeypatch)
         players = {
             "A": {"xp": 5, "level": 1, "badges": [], "history": []},
             "B": {"xp": 50, "level": 1, "badges": [], "history": []},
@@ -114,8 +147,8 @@ class TestApiMainIntegration:
             {"name": "A", "xp": 5},
         ]
 
-    def test_stop_persists_history_and_progress(self, tmp_path, monkeypatch):
-        player_file = self._set_temp_player_file(tmp_path, monkeypatch)
+    def test_stop_persists_history_and_progress(self, monkeypatch):
+        player_file = self._set_temp_player_file(monkeypatch)
         engine = main.engine
         engine.state["reps"] = 12
         engine.state["exercise"] = "Low Plank"
@@ -137,9 +170,9 @@ class TestApiMainIntegration:
         assert saved["Nina"]["history"][0]["exercise"] == "Low Plank"
 
     def test_signout_returns_signed_out_without_active_workout(
-        self, tmp_path, monkeypatch
+        self, monkeypatch
     ):
-        self._set_temp_player_file(tmp_path, monkeypatch)
+        self._set_temp_player_file(monkeypatch)
 
         response = self.client.post("/signout", params={"name": "Maya"})
 
@@ -147,9 +180,9 @@ class TestApiMainIntegration:
         assert response.json() == {"status": "signed_out"}
 
     def test_signout_stops_active_workout_and_persists_progress(
-        self, tmp_path, monkeypatch
+        self, monkeypatch
     ):
-        player_file = self._set_temp_player_file(tmp_path, monkeypatch)
+        player_file = self._set_temp_player_file(monkeypatch)
         engine = main.engine
         engine.running = True
         engine.state["reps"] = 9
