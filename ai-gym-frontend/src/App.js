@@ -57,6 +57,41 @@ function App() {
   const mediaTrackRegistryRef = useRef(new Set());
   const startSequenceRef = useRef(0);
 
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const ensureApiAwake = async () => {
+    // Render free services can sleep; wake API before starting workout flow.
+    await fetch(apiUrl("/"), { method: "GET" });
+  };
+
+  const startSessionWithRetry = async (maxAttempts = 3) => {
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        await ensureApiAwake();
+        const res = await fetch(
+          apiUrl(`/start?exercise=${selectedExercise}&name=${username}`),
+          { method: "POST" }
+        );
+
+        if (!res.ok) {
+          throw new Error("Failed to start workout");
+        }
+
+        return;
+      } catch (error) {
+        lastError = error;
+
+        if (attempt < maxAttempts) {
+          await delay(1400 * attempt);
+        }
+      }
+    }
+
+    throw lastError || new Error("Failed to start workout");
+  };
+
   function drawSkeleton(ctx, landmarks, w, h) {
     if (!landmarks || landmarks.length === 0) return;
     ctx.strokeStyle = "#00ff88";
@@ -407,13 +442,7 @@ function App() {
     setCameraError("");
 
     try {
-      const res = await fetch(
-        apiUrl(`/start?exercise=${selectedExercise}&name=${username}`),
-        { method: "POST" }
-      );
-      if (!res.ok) {
-        throw new Error("Failed to start workout");
-      }
+      await startSessionWithRetry();
 
       await startWebRTC();
 
@@ -426,7 +455,19 @@ function App() {
       setIsWorkoutActive(true);
     } catch (error) {
       console.error("Start workout error:", error);
-      setCameraError(error?.message || "Could not start camera/workout.");
+
+      const isFetchFailure =
+        error?.name === "TypeError" ||
+        String(error?.message || "").toLowerCase().includes("failed to fetch");
+
+      if (isFetchFailure) {
+        setCameraError(
+          "Could not reach backend. Render free tier may be waking up; wait 20-40 seconds and click Start Workout again."
+        );
+      } else {
+        setCameraError(error?.message || "Could not start camera/workout.");
+      }
+
       stopWebRTC();
       setIsWorkoutActive(false);
 
