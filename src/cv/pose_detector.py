@@ -1,4 +1,5 @@
 import cv2
+import importlib
 try:
     import mediapipe as mp
 except ImportError:  # pragma: no cover - handled at runtime in __init__
@@ -25,17 +26,7 @@ class PoseDetector:
                 "Install `mediapipe` in this environment."
             )
 
-        solutions_module = getattr(mp, "solutions", None)
-        if solutions_module is None:
-            try:
-                from mediapipe.python import solutions as mp_solutions
-            except Exception as exc:  # pragma: no cover
-                raise RuntimeError(
-                    "MediaPipe solutions module is unavailable in this environment."
-                ) from exc
-            solutions_module = mp_solutions
-
-        self.mp_pose = solutions_module.pose
+        self.mp_pose, self.mp_draw = self._resolve_mediapipe_modules()
         self.pose = self.mp_pose.Pose(
             static_image_mode=static_image_mode,
             model_complexity=model_complexity,
@@ -43,7 +34,6 @@ class PoseDetector:
             min_detection_confidence=detection_confidence,
             min_tracking_confidence=tracking_confidence,
         )
-        self.mp_draw = solutions_module.drawing_utils
         # Slightly lower visibility threshold avoids dropping usable landmarks.
         self.landmark_filter = LandmarkFilter(visibility_threshold=0.25)
         # Higher alpha tracks motion faster, reducing rep transition lag.
@@ -51,6 +41,33 @@ class PoseDetector:
         self.results = None
         self.pose_validator = PoseValidator()
         self.coordinate_normalizer = CoordinateNormalizer()
+
+    @staticmethod
+    def _resolve_mediapipe_modules():
+        """Resolve MediaPipe pose+drawing modules across package variants."""
+        solutions_module = getattr(mp, "solutions", None)
+        if solutions_module is not None:
+            return solutions_module.pose, solutions_module.drawing_utils
+
+        import_candidates = [
+            (
+                "mediapipe.python.solutions.pose",
+                "mediapipe.python.solutions.drawing_utils",
+            ),
+            ("mediapipe.solutions.pose", "mediapipe.solutions.drawing_utils"),
+        ]
+
+        for pose_module_path, drawing_module_path in import_candidates:
+            try:
+                pose_module = importlib.import_module(pose_module_path)
+                drawing_module = importlib.import_module(drawing_module_path)
+                return pose_module, drawing_module
+            except Exception:
+                continue
+
+        raise RuntimeError(
+            "MediaPipe solutions module is unavailable in this environment."
+        )
 
     def process(self, frame):
         """Process frame and detect pose landmarks.
