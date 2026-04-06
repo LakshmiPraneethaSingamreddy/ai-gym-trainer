@@ -222,7 +222,15 @@ def start_workout(
     camera_mode = (
         USE_BACKEND_CAMERA if use_backend_camera is None else use_backend_camera
     )
-    engine.start(use_camera=camera_mode, render_frames=SEND_WS_FRAMES)
+
+    try:
+        engine.start(use_camera=camera_mode, render_frames=SEND_WS_FRAMES)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Workout engine failed to start: {exc}",
+        ) from exc
+
     return {"status": "started", "exercise": selected_exercise}
 
 

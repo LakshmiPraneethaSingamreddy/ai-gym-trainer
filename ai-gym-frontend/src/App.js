@@ -76,7 +76,17 @@ function App() {
         );
 
         if (!res.ok) {
-          throw new Error("Failed to start workout");
+          let errorDetail = "Failed to start workout";
+          try {
+            const errorPayload = await res.json();
+            if (errorPayload?.detail) {
+              errorDetail = errorPayload.detail;
+            }
+          } catch (_parseError) {
+            // Keep default message when response body is not JSON.
+          }
+
+          throw new Error(errorDetail);
         }
 
         return;
