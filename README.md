@@ -4,15 +4,28 @@ AI Gym Trainer is a **full-stack AI fitness trainer** that delivers **real-time 
 
 It turns a standard browser camera into an interactive workout assistant: the frontend streams video to the backend, and the app returns live state updates such as reps, feedback, **XP system** progress, levels, and badges.
 
-## Demo
+## Deployment
 
-Project links:
+This project is fully hosted and deployed for production use:
 
-- Live Demo: `https://...`
-- Demo Video: `https://...`
-- Screenshots/GIFs: 
+- **Backend**: Deployed on [Render](https://render.com/) for reliable API and WebSocket streaming
+- **Frontend**: Deployed on [Vercel](https://vercel.com/) for fast, global CDN delivery
 
-## Features
+## Live Demo
+
+Access the live application here: **[AI Gym Trainer - Live Demo](https://ai-gym-trainer-ha3yob7n5-lakshmipraneethasingamreddys-projects.vercel.app/)**
+
+## Demo Images
+
+Screenshots showing the application in action:
+
+| Main Workout Interface | Sign Up / Sign In |
+|---|---|
+| ![Workout Interface](./images/main-interface.png) | ![Sign Up Screen](./images/signup-screen.png) |
+
+**Main Workout Interface**: Real-time rep counting, posture feedback, XP tracking, and level-wise leaderboard.
+
+**Sign Up/Sign In**: Simple authentication to create or access your user profile and track progress.
 
 - **Real-time workout tracking** directly from browser webcam input
 - **Exercise form analysis** with exercise-specific movement-state detection
