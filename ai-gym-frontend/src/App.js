@@ -56,31 +56,69 @@ function App() {
   const pcRef = useRef(null);
   const mediaTrackRegistryRef = useRef(new Set());
   const startSequenceRef = useRef(0);
+  const frameUploadTimerRef = useRef(null);
+  const frameUploadCanvasRef = useRef(null);
+  const frameUploadInFlightRef = useRef(false);
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const waitForIceGatheringComplete = (pc, timeoutMs = 3000) =>
-    new Promise((resolve) => {
-      if (!pc || pc.iceGatheringState === "complete") {
-        resolve();
+  const stopFrameUploadLoop = () => {
+    if (frameUploadTimerRef.current) {
+      clearTimeout(frameUploadTimerRef.current);
+      frameUploadTimerRef.current = null;
+    }
+    frameUploadInFlightRef.current = false;
+  };
+
+  const startFrameUploadLoop = () => {
+    stopFrameUploadLoop();
+
+    if (!frameUploadCanvasRef.current) {
+      frameUploadCanvasRef.current = document.createElement("canvas");
+    }
+
+    const uploadCanvas = frameUploadCanvasRef.current;
+    const uploadCtx = uploadCanvas.getContext("2d");
+    const intervalMs = 120;
+
+    const uploadTick = async () => {
+      const video = localVideoRef.current;
+      const stream = localStreamRef.current;
+
+      if (!video || !stream) {
         return;
       }
 
-      const timeout = setTimeout(() => {
-        pc.removeEventListener("icegatheringstatechange", checkState);
-        resolve();
-      }, timeoutMs);
+      const width = video.videoWidth || 640;
+      const height = video.videoHeight || 480;
+      if (uploadCanvas.width !== width || uploadCanvas.height !== height) {
+        uploadCanvas.width = width;
+        uploadCanvas.height = height;
+      }
 
-      const checkState = () => {
-        if (pc.iceGatheringState === "complete") {
-          clearTimeout(timeout);
-          pc.removeEventListener("icegatheringstatechange", checkState);
-          resolve();
+      if (video.readyState >= 2 && !frameUploadInFlightRef.current) {
+        uploadCtx.drawImage(video, 0, 0, uploadCanvas.width, uploadCanvas.height);
+        const jpegBase64 = uploadCanvas.toDataURL("image/jpeg", 0.6).split(",")[1];
+
+        try {
+          frameUploadInFlightRef.current = true;
+          await fetch(apiUrl("/frame"), {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: jpegBase64,
+          });
+        } catch (error) {
+          // Keep loop alive; temporary network hiccups are expected on free tiers.
+        } finally {
+          frameUploadInFlightRef.current = false;
         }
-      };
+      }
 
-      pc.addEventListener("icegatheringstatechange", checkState);
-    });
+      frameUploadTimerRef.current = setTimeout(uploadTick, intervalMs);
+    };
+
+    uploadTick();
+  };
 
   const ensureApiAwake = async () => {
     // Render free services can sleep; wake API before starting workout flow.
@@ -185,6 +223,7 @@ function App() {
 
   const stopWebRTC = () => {
     setIsWebRTCActive(false);
+    stopFrameUploadLoop();
 
     if (pcRef.current) {
       try {
@@ -318,36 +357,7 @@ function App() {
       }
     }
     setIsWebRTCActive(true);
-
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
-    });
-    pcRef.current = pc;
-    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
-
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await waitForIceGatheringComplete(pc);
-
-    const response = await fetch(apiUrl("/webrtc/offer"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sdp: offer.sdp,
-        type: offer.type,
-      }),
-    });
-
-    if (!response.ok) {
-      stopWebRTC();
-      throw new Error("WebRTC signaling failed");
-    }
-
-    const answer = await response.json();
-    if (pc.signalingState === "closed") {
-      throw new Error("WebRTC session was closed before negotiation completed.");
-    }
-    await pc.setRemoteDescription(answer);
+    startFrameUploadLoop();
   };
 
   useEffect(() => {

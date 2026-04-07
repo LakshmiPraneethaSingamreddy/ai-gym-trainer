@@ -1,4 +1,11 @@
-from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.responses import FileResponse
@@ -346,6 +353,18 @@ def get_state():
     return engine.get_state()
 
 
+@app.get("/debug/pipeline")
+def debug_pipeline():
+    """Expose runtime pose pipeline signals for deployment troubleshooting."""
+    return {
+        "running": engine.running,
+        "has_pending_external_frame": engine.has_pending_external_frame(),
+        "landmarks_count": len(engine.display_landmarks),
+        "last_processing_error": engine.last_processing_error,
+        "render_frames": engine.render_frames,
+    }
+
+
 @app.post("/webrtc/offer")
 async def webrtc_offer(offer: RTCOffer):
     pc = RTCPeerConnection()
@@ -389,6 +408,36 @@ async def webrtc_offer(offer: RTCOffer):
         "sdp": pc.localDescription.sdp,
         "type": pc.localDescription.type,
     }
+
+
+@app.post("/frame")
+async def ingest_frame(request: Request):
+    """Ingest a camera frame over HTTPS for deployment environments.
+
+    Expects request body to be raw base64-encoded JPEG bytes (no data URL prefix).
+    """
+    if not engine.running:
+        raise HTTPException(status_code=409, detail="Workout is not running")
+
+    payload = (await request.body()).decode("utf-8").strip()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Empty frame payload")
+
+    try:
+        frame_bytes = base64.b64decode(payload)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid base64 frame payload",
+        ) from exc
+
+    frame_buffer = np.frombuffer(frame_bytes, dtype=np.uint8)
+    frame = cv2.imdecode(frame_buffer, cv2.IMREAD_COLOR)
+    if frame is None:
+        raise HTTPException(status_code=400, detail="Invalid JPEG frame payload")
+
+    engine.ingest_external_frame(frame)
+    return {"status": "accepted"}
 
 
 @app.on_event("shutdown")
