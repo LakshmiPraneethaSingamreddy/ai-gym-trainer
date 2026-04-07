@@ -263,6 +263,7 @@ def start_workout(
     exercise: str = "Squat",
     name: str = "You",
     use_backend_camera: Optional[bool] = None,
+    db: Session = Depends(get_db),
 ):
     """Start a workout session with specified exercise.
 
@@ -275,6 +276,16 @@ def start_workout(
     Returns:
         dict: Status and selected exercise name.
     """
+    try:
+        clean_name = normalize_name(name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    user = create_user_if_missing(db, clean_name)
+    db.commit()
+    db.refresh(user)
+    sync_engine_player(user)
+
     selected_exercise = engine.set_exercise(exercise)
     camera_mode = (
         USE_BACKEND_CAMERA if use_backend_camera is None else use_backend_camera
