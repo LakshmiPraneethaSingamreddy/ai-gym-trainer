@@ -35,6 +35,11 @@ COPY --from=frontend-builder /frontend/build ./ai-gym-frontend/build
 # MediaPipe model assets must be readable by the runtime user.
 RUN chmod -R a+rX /usr/local/lib/python3.10/site-packages
 
+# Some MediaPipe wheels lazily download pose models on first use.
+# Keep the module cache writable for the non-root runtime user.
+RUN mkdir -p /usr/local/lib/python3.10/site-packages/mediapipe/modules && \
+    chmod -R a+rwX /usr/local/lib/python3.10/site-packages/mediapipe/modules
+
 # Ensure application files are readable by the runtime user.
 RUN chown -R appuser:appuser /app
 

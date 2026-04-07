@@ -224,20 +224,31 @@ class WorkoutEngine:
             self.running = True
             self.render_frames = render_frames
 
-            self.detector = PoseDetector()
-            self.cam = Camera() if use_camera else None
-            self._external_frame = None
+            try:
+                self.detector = PoseDetector()
+                self.cam = Camera() if use_camera else None
+                self._external_frame = None
 
-            if use_camera:
-                self.thread = threading.Thread(target=self.run_loop, daemon=True)
-                self.thread.start()
-                self._external_thread = None
-            else:
+                if use_camera:
+                    self.thread = threading.Thread(target=self.run_loop, daemon=True)
+                    self.thread.start()
+                    self._external_thread = None
+                else:
+                    self.thread = None
+                    self._external_thread = threading.Thread(
+                        target=self.run_external_loop, daemon=True
+                    )
+                    self._external_thread.start()
+            except Exception:
+                # Ensure failed startup does not leave engine in a half-running state.
+                self.running = False
+                self.detector = None
+                self.cam = None
                 self.thread = None
-                self._external_thread = threading.Thread(
-                    target=self.run_external_loop, daemon=True
-                )
-                self._external_thread.start()
+                self._external_thread = None
+                with self._external_frame_lock:
+                    self._external_frame = None
+                raise
 
     def ingest_external_frame(self, frame):
         if not self.running or frame is None:

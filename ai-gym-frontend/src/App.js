@@ -318,6 +318,9 @@ function App() {
     }
 
     const answer = await response.json();
+    if (pc.signalingState === "closed") {
+      throw new Error("WebRTC session was closed before negotiation completed.");
+    }
     await pc.setRemoteDescription(answer);
   };
 
