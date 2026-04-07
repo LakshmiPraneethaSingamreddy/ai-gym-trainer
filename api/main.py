@@ -483,7 +483,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     _, buffer = cv2.imencode(".jpg", blank, encode_params)
                     frame_b64 = base64.b64encode(buffer).decode("utf-8")
                 await websocket.send_text(
-                    json.dumps({"frame": frame_b64, "landmarks": []})
+                    json.dumps(
+                        {
+                            "frame": frame_b64,
+                            "landmarks": [],
+                            "has_frame": False,
+                        }
+                    )
                 )
                 await asyncio.sleep(0.1)
                 continue
@@ -506,6 +512,7 @@ async def websocket_endpoint(websocket: WebSocket):
             payload = json.dumps(
                 {
                     "frame": frame_b64,
+                    "has_frame": True,
                     "landmarks": engine.display_landmarks,
                     **state_snapshot,
                 }

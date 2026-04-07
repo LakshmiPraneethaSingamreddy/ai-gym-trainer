@@ -59,8 +59,40 @@ function App() {
   const frameUploadTimerRef = useRef(null);
   const frameUploadCanvasRef = useRef(null);
   const frameUploadInFlightRef = useRef(false);
+  const fallbackCheckTimerRef = useRef(null);
+  const backendFrameSeenRef = useRef(false);
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const waitForIceGatheringComplete = (pc, timeoutMs = 3000) =>
+    new Promise((resolve) => {
+      if (!pc || pc.iceGatheringState === "complete") {
+        resolve();
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        pc.removeEventListener("icegatheringstatechange", checkState);
+        resolve();
+      }, timeoutMs);
+
+      const checkState = () => {
+        if (pc.iceGatheringState === "complete") {
+          clearTimeout(timeout);
+          pc.removeEventListener("icegatheringstatechange", checkState);
+          resolve();
+        }
+      };
+
+      pc.addEventListener("icegatheringstatechange", checkState);
+    });
+
+  const clearFallbackCheckTimer = () => {
+    if (fallbackCheckTimerRef.current) {
+      clearTimeout(fallbackCheckTimerRef.current);
+      fallbackCheckTimerRef.current = null;
+    }
+  };
 
   const stopFrameUploadLoop = () => {
     if (frameUploadTimerRef.current) {
@@ -86,6 +118,7 @@ function App() {
       const stream = localStreamRef.current;
 
       if (!video || !stream) {
+        frameUploadTimerRef.current = setTimeout(uploadTick, intervalMs);
         return;
       }
 
@@ -223,7 +256,9 @@ function App() {
 
   const stopWebRTC = () => {
     setIsWebRTCActive(false);
+    clearFallbackCheckTimer();
     stopFrameUploadLoop();
+    backendFrameSeenRef.current = false;
 
     if (pcRef.current) {
       try {
@@ -295,6 +330,7 @@ function App() {
 
   const startWebRTC = async () => {
     stopWebRTC();
+    backendFrameSeenRef.current = false;
 
     const canUseGetUserMedia =
       typeof navigator !== "undefined" &&
@@ -357,61 +393,149 @@ function App() {
       }
     }
     setIsWebRTCActive(true);
-    startFrameUploadLoop();
+
+    try {
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
+      });
+      pcRef.current = pc;
+      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await waitForIceGatheringComplete(pc);
+
+      const response = await fetch(apiUrl("/webrtc/offer"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sdp: offer.sdp,
+          type: offer.type,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("WebRTC signaling failed");
+      }
+
+      const answer = await response.json();
+      if (pc.signalingState === "closed") {
+        throw new Error("WebRTC session was closed before negotiation completed.");
+      }
+      await pc.setRemoteDescription(answer);
+    } catch (error) {
+      // Keep app functional if WebRTC media path fails in hosted environments.
+      startFrameUploadLoop();
+      return;
+    }
+
+    clearFallbackCheckTimer();
+    fallbackCheckTimerRef.current = setTimeout(() => {
+      if (!backendFrameSeenRef.current) {
+        startFrameUploadLoop();
+      }
+    }, 3500);
   };
 
   useEffect(() => {
     return () => {
       stopWebRTC();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // WebSocket — replaces the 250ms polling interval
   // Receives video frame + landmarks + state in one message at ~30fps
   useEffect(() => {
     if (!username) return;
 
-    const ws = new WebSocket(wsUrl("/ws"));
+    let ws;
+    let reconnectTimer = null;
+    let shouldReconnect = true;
+    let isCleaningUp = false;
 
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setLandmarks(data.landmarks || []);
-
-      // Update workout state
-      if (data.reps !== undefined) {
-        setState({
-          reps: data.reps,
-          xp: data.xp,
-          xp_required: data.xp_required,
-          level: data.level,
-          feedback: data.feedback,
-          exercise: data.exercise,
-          badges: data.badges || []
-        });
-
-        if (data.badges?.length > 0) {
-          setBadgeQueue(prev => {
-            const newBadges = data.badges.filter(b => !prev.includes(b));
-            return [...prev, ...newBadges];
-          });
-        }
+    const scheduleReconnect = () => {
+      if (!shouldReconnect || reconnectTimer !== null) {
+        return;
       }
-
-      // Draw frame + skeleton on canvas
-      const canvas = canvasRef.current;
-      if (!canvas || !data.frame || isWebRTCActive) return;
-      const ctx = canvas.getContext("2d");
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        drawSkeleton(ctx, data.landmarks, canvas.width, canvas.height);
-      };
-      img.src = "data:image/jpeg;base64," + data.frame;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connectWebSocket();
+      }, 1000);
     };
 
-    ws.onerror = (err) => console.error("WebSocket error:", err);
+    const connectWebSocket = () => {
+      if (!shouldReconnect) {
+        return;
+      }
 
-    return () => ws.close();
+      ws = new WebSocket(wsUrl("/ws"));
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.has_frame) {
+          backendFrameSeenRef.current = true;
+        }
+        setLandmarks(data.landmarks || []);
+
+        // Update workout state
+        if (data.reps !== undefined) {
+          setState({
+            reps: data.reps,
+            xp: data.xp,
+            xp_required: data.xp_required,
+            level: data.level,
+            feedback: data.feedback,
+            exercise: data.exercise,
+            badges: data.badges || []
+          });
+
+          if (data.badges?.length > 0) {
+            setBadgeQueue(prev => {
+              const newBadges = data.badges.filter(b => !prev.includes(b));
+              return [...prev, ...newBadges];
+            });
+          }
+        }
+
+        // Draw frame + skeleton on canvas
+        const canvas = canvasRef.current;
+        if (!canvas || !data.frame || isWebRTCActive) return;
+        const ctx = canvas.getContext("2d");
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          drawSkeleton(ctx, data.landmarks, canvas.width, canvas.height);
+        };
+        img.src = "data:image/jpeg;base64," + data.frame;
+      };
+
+      ws.onerror = (err) => {
+        if (shouldReconnect && !isCleaningUp) {
+          console.error("WebSocket error:", err);
+        }
+      };
+
+      ws.onclose = () => {
+        if (shouldReconnect && !isCleaningUp) {
+          scheduleReconnect();
+        }
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      isCleaningUp = true;
+      shouldReconnect = false;
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+      }
+      if (ws) {
+        ws.onerror = null;
+        ws.onclose = null;
+        ws.close();
+      }
+    };
   }, [username, isWebRTCActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
