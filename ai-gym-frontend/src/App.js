@@ -59,6 +59,29 @@ function App() {
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  const waitForIceGatheringComplete = (pc, timeoutMs = 3000) =>
+    new Promise((resolve) => {
+      if (!pc || pc.iceGatheringState === "complete") {
+        resolve();
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        pc.removeEventListener("icegatheringstatechange", checkState);
+        resolve();
+      }, timeoutMs);
+
+      const checkState = () => {
+        if (pc.iceGatheringState === "complete") {
+          clearTimeout(timeout);
+          pc.removeEventListener("icegatheringstatechange", checkState);
+          resolve();
+        }
+      };
+
+      pc.addEventListener("icegatheringstatechange", checkState);
+    });
+
   const ensureApiAwake = async () => {
     // Render free services can sleep; wake API before starting workout flow.
     await fetch(apiUrl("/"), { method: "GET" });
@@ -296,12 +319,15 @@ function App() {
     }
     setIsWebRTCActive(true);
 
-    const pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }],
+    });
     pcRef.current = pc;
     localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    await waitForIceGatheringComplete(pc);
 
     const response = await fetch(apiUrl("/webrtc/offer"), {
       method: "POST",

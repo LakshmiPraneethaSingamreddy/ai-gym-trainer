@@ -83,6 +83,20 @@ class RTCOffer(BaseModel):
     type: str
 
 
+async def wait_for_ice_gathering_complete(
+    pc: RTCPeerConnection, timeout_seconds: float = 3.0
+) -> None:
+    """Wait briefly for ICE gathering so SDP contains usable candidates."""
+    if pc.iceGatheringState == "complete":
+        return
+
+    deadline = asyncio.get_running_loop().time() + timeout_seconds
+    while pc.iceGatheringState != "complete":
+        if asyncio.get_running_loop().time() >= deadline:
+            break
+        await asyncio.sleep(0.05)
+
+
 LEGACY_PLAYER_FILE = Path(__file__).resolve().parent.parent / \
                           "src" / "data" / "players.json"
 PLAYER_FILE = LEGACY_PLAYER_FILE
@@ -369,6 +383,7 @@ async def webrtc_offer(offer: RTCOffer):
     await pc.setRemoteDescription(RTCSessionDescription(sdp=offer.sdp, type=offer.type))
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
+    await wait_for_ice_gathering_complete(pc)
 
     return {
         "sdp": pc.localDescription.sdp,

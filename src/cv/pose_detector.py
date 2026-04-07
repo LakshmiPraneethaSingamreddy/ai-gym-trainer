@@ -39,7 +39,8 @@ class PoseDetector:
         if solutions_module is not None:
             return solutions_module.pose, solutions_module.drawing_utils
 
-        # Older MediaPipe layout fallback kept commented out while deployment behavior is isolated.
+        # Older MediaPipe layout fallback is commented out
+        # while deployment behavior is being isolated.
         # import_candidates = [
         #     (
         #         "mediapipe.python.solutions.pose",

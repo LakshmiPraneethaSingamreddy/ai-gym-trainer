@@ -3,11 +3,13 @@ from typing import List
 import mediapipe as mp
 
 if not hasattr(mp, "solutions") or not hasattr(mp.solutions, "pose"):
-    raise RuntimeError("MediaPipe pose solutions module is unavailable in this environment.")
+    raise RuntimeError(
+        "MediaPipe pose solutions module is unavailable in this environment."
+    )
 
 PoseLandmark = mp.solutions.pose.PoseLandmark
 
-# Old layout fallback kept commented for now while MediaPipe deployment issues are being isolated.
+# Old layout fallback remains commented while deployment behavior is isolated.
 # try:
 #     from mediapipe.python.solutions.pose import PoseLandmark
 # except ImportError:
